@@ -1,439 +1,519 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+"""
+Mojtaba Reality Surgeon V7.3
+
+Implements (explicitly):
+1) Multi-Layer Deduplication: host(or ip):port + sni + pbk
+2) Golden Ports Priority: ONLY {443,2053,2083,8443} allowed
+3) Mandatory Fingerprint: fp=chrome AND type=tcp for reality
+4) Operator-Aware Ranking: heuristic scoring tuned for Iran networks
+5) Failure Telemetry: detailed reject/accept counters written to JSON
+
+Notes:
+- No live tests (as requested).
+- Base64-aware source body decoding (common for subscriptions).
+"""
+
 from __future__ import annotations
 
-import asyncio
+import base64
 import json
 import re
-import socket
 import time
-from collections import defaultdict
-from dataclasses import dataclass, field
-from typing import Any
-from urllib.parse import parse_qs, quote, urlencode, urlparse
+from dataclasses import dataclass
+from typing import Dict, List, Optional, Tuple
+from urllib.parse import parse_qs, quote, unquote, urlparse
 
 import requests
 
+VERSION = "7.3"
 
-VERSION = "7.1"
-
+# ---- Sources (includes the 5 links you asked to add) ----
 SOURCES = [
     "https://raw.githubusercontent.com/soroushmirzaei/telegram-configs-collector/main/protocols/vless",
     "https://raw.githubusercontent.com/mahdibland/ShadowsocksAggregator/master/Eternity.txt",
     "https://raw.githubusercontent.com/itsyebekhe/HiN-VPN/main/subscription/normal/mix",
     "https://raw.githubusercontent.com/barry-far/V2ray-Configs/main/All_Configs_Sub.txt",
+
+    "https://raw.githubusercontent.com/barry-far/V2ray-Config/refs/heads/main/All_Configs_Sub.txt",
+    "https://raw.githubusercontent.com/SoliSpirit/v2ray-configs/refs/heads/main/Protocols/vless.txt",
+    "https://raw.githubusercontent.com/mrvcoder/V2rayCollector/refs/heads/main/vless_iran.txt",
+    "https://raw.githubusercontent.com/jafarm83/ConfigV2Ray/refs/heads/main/jafar_ultimate.txt",
+    "https://raw.githubusercontent.com/iboxz/free-v2ray-collector/refs/heads/main/main/vless.txt",
 ]
 
 OUTPUT_FILE = "MOJTABA_CLEAN_LIST.txt"
 TELEMETRY_FILE = "surgeon_telemetry.json"
 
-MAX_OUTPUT = 96
+MAX_OUTPUT = 128
 MAX_PER_HOST = 2
-
-PHASE2_CANDIDATES = 120
-LIVE_TEST_ENABLED = True
-LIVE_TEST_MODE = "tcp"   # "off" | "dns" | "tcp"
-LIVE_TEST_WORKERS = 16
-
 FETCH_TIMEOUT = 20
-DNS_TIMEOUT = 1.0
-TCP_TIMEOUT = 1.2
-USER_AGENT = "Mozilla/5.0 (Mojtaba-Reality-Surgeon-V7.1)"
 
-GOOD_PORTS = {443, 8443, 2053, 2083, 2087, 2096}
-BAD_PORTS = {80, 81, 88, 8080, 8880, 2052, 2082, 2086, 2095}
-GOOD_FLOWS = {"xtls-rprx-vision", "xtls-rprx-vision-udp443"}
-GOOD_FPS = {"chrome", "firefox", "safari", "edge", "ios", "android"}
+# ---- Golden ports: strict allow-list ----
+GOLDEN_PORTS = {443, 2053, 2083, 8443}
 
-SUSPICIOUS_SNI_TOKENS = {
-    "cloudflare", "workers", "github", "localhost", "127.0.0.1",
-    "example", "test", "invalid", "fake", "temp", "random",
-}
+# ---- Mandatory fingerprint ----
+MANDATORY_FP = "chrome"
+MANDATORY_NET = "tcp"
 
-PREFERRED_SNI_SUFFIXES = (".com", ".net", ".org", ".io", ".co", ".dev", ".app")
+# Reality required keys
+REALITY_REQUIRED_KEYS = ("pbk", "sid", "sni")
+
+# Operator-aware heuristics
+PREFERRED_SNI_SUFFIXES = (".com", ".net", ".org", ".io", ".dev", ".app", ".co", ".me", ".ai")
+SUSPICIOUS_SNI_TOKENS = (
+    "telegram", "proxy", "vpn", "filter", "youtube", "porn", "adult",
+    "fake", "test", "temp", "localhost", "local", "example", "invalid"
+)
+
+GOOD_FLOW = "xtls-rprx-vision"
+# (در این نسخه strict هستیم: اگر flow هست و این نیست، رد)
+ALLOWED_FLOWS = {GOOD_FLOW}
+
+UA = "Mozilla/5.0 (X11; Linux x86_64) MojtabaRealitySurgeon/7.3"
 
 
 @dataclass
 class Candidate:
     raw_url: str
-    scheme: str
     uuid: str
     host: str
     port: int
-    params: dict[str, str]
-    fragment: str = ""
-    base_score: float = 0.0
-    live_score: float = 0.0
-    final_score: float = 0.0
-    normalized_url: str = ""
-    key: str = ""
-    notes: list[str] = field(default_factory=list)
+    query: Dict[str, str]
+    tag: str
+    score: int
+    dedupe_key: str  # host(or ip):port + sni + pbk
 
-    def get(self, key: str, default: str = "") -> str:
-        return self.params.get(key, default)
 
-    @property
-    def sni(self) -> str:
-        return self.get("sni")
+def safe_b64decode(text: str) -> Optional[str]:
+    s = (text or "").strip()
+    if not s:
+        return None
 
-    @property
-    def pbk(self) -> str:
-        return self.get("pbk")
+    compact = "".join(s.split())
+    if not compact:
+        return None
 
-    @property
-    def sid(self) -> str:
-        return self.get("sid")
+    # If already contains vless, don't b64 decode
+    if "vless://" in compact.lower():
+        return None
+
+    allowed = set("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=_-")
+    head = compact[:600]
+    if any(ch not in allowed for ch in head):
+        return None
+
+    padding = (-len(compact)) % 4
+    compact += "=" * padding
+
+    for altchars in (None, b"-_"):
+        try:
+            raw = base64.b64decode(compact, altchars=altchars, validate=False)
+            decoded = raw.decode("utf-8", errors="ignore")
+            if "vless://" in decoded.lower():
+                return decoded
+        except Exception:
+            pass
+    return None
+
+
+def maybe_decode_body(text: str) -> str:
+    decoded = safe_b64decode(text)
+    return decoded if decoded else (text or "")
+
+
+def extract_vless_links(text: str) -> List[str]:
+    matches = re.findall(r'vless://[^\s"<>\']+', text or "", flags=re.IGNORECASE)
+    out, seen = [], set()
+    for m in matches:
+        x = m.strip().strip('\'"')
+        x = x.rstrip("),.;]")
+        if x.lower().startswith("vless://") and x not in seen:
+            seen.add(x)
+            out.append(x)
+    return out
 
 
 def normalize_fp(fp: str) -> str:
-    fp = (fp or "").strip().lower()
-    if fp in {"chromium", "chrome"}:
-        return "chrome"
-    if fp in GOOD_FPS:
-        return fp
-    return "chrome"
+    v = (fp or "").strip().lower()
+    aliases = {
+        "chromium": "chrome",
+        "google chrome": "chrome",
+    }
+    return aliases.get(v, v)
 
 
 def clean_host(host: str) -> str:
-    return (host or "").strip().lower().rstrip(".")
+    return (host or "").strip().strip(".").lower()
 
 
-def parse_query_single(query: str) -> dict[str, str]:
-    parsed = parse_qs(query, keep_blank_values=True)
-    return {k: (v[-1] if v else "") for k, v in parsed.items()}
+def parse_query_single(query: str) -> Dict[str, str]:
+    parsed = parse_qs(query or "", keep_blank_values=True)
+    out = {}
+    for k, v in parsed.items():
+        if not v:
+            continue
+        out[k.lower()] = (v[0] or "").strip()
+    return out
 
 
-def looks_like_domain(name: str) -> bool:
-    if not name or len(name) > 253 or " " in name:
+def is_ipv4(host: str) -> bool:
+    return bool(re.fullmatch(r"(?:\d{1,3}\.){3}\d{1,3}", host or ""))
+
+
+def looks_like_domain(host: str) -> bool:
+    h = clean_host(host)
+    if not h or len(h) > 253:
         return False
-    if re.match(r"^\d+\.\d+\.\d+\.\d+$", name):
-        return True
-    return "." in name and all(part and len(part) <= 63 for part in name.split("."))
+    if "." not in h:
+        return False
+    if is_ipv4(h):
+        return False
+    labels = h.split(".")
+    for label in labels:
+        if not label or len(label) > 63:
+            return False
+        if label.startswith("-") or label.endswith("-"):
+            return False
+        if not re.fullmatch(r"[a-z0-9-]+", label):
+            return False
+    return True
 
 
 def should_reject_sni(sni: str) -> bool:
-    sni = clean_host(sni)
-    if not sni or not looks_like_domain(sni):
+    s = clean_host(sni)
+    if not looks_like_domain(s):
         return True
-    return any(token in sni for token in SUSPICIOUS_SNI_TOKENS)
+    for tok in SUSPICIOUS_SNI_TOKENS:
+        if tok in s:
+            return True
+    return False
 
 
-def build_candidate_key(host: str, port: int, sni: str, pbk: str, sid: str) -> str:
-    return f"{clean_host(host)}:{port}|{clean_host(sni)}|{pbk.strip()}|{sid.strip()}"
-
-
-def encode_vless(c: Candidate) -> str:
-    query = c.params.copy()
-    query["fp"] = normalize_fp(query.get("fp", "chrome"))
-    query_str = urlencode(query, doseq=False, quote_via=quote)
-    fragment = quote(c.fragment or "", safe="")
-    return f"vless://{c.uuid}@{c.host}:{c.port}?{query_str}#{fragment}"
-
-
-def parse_vless_url(url: str) -> Candidate | None:
+def parse_vless_url(url: str) -> Optional[Tuple[str, str, int, Dict[str, str], str]]:
     try:
-        parsed = urlparse(url.strip())
+        parsed = urlparse(url)
         if parsed.scheme.lower() != "vless":
             return None
-
+        uuid = unquote(parsed.username or "").strip()
         host = clean_host(parsed.hostname or "")
-        port = parsed.port or 0
-        uuid = parsed.username or ""
-        params = parse_query_single(parsed.query)
-        fragment = parsed.fragment or ""
-
-        if not host or not port or not uuid:
+        port = int(parsed.port or 0)
+        query = parse_query_single(parsed.query)
+        tag = unquote(parsed.fragment or "").strip()
+        if not uuid or not host or port <= 0:
             return None
-
-        return Candidate(
-            raw_url=url.strip(),
-            scheme="vless",
-            uuid=uuid.strip(),
-            host=host,
-            port=port,
-            params=params,
-            fragment=fragment.strip(),
-        )
+        return uuid, host, port, query, tag
     except Exception:
         return None
 
 
-def validate_and_score(candidate: Candidate) -> Candidate | None:
-    p = candidate.params
+def build_dedupe_key(host: str, port: int, sni: str, pbk: str) -> str:
+    # Multi-layer dedupe per spec: IP(or host):Port + SNI + PBK
+    # If host is an IP, it's already IP. Otherwise host is domain (we can't resolve IP offline here).
+    return f"{clean_host(host)}:{port}|{clean_host(sni)}|{(pbk or '').strip()}"
 
-    if p.get("security", "").lower() != "reality":
-        return None
 
-    net = p.get("type", "").strip().lower()
-    if net and net != "tcp":
-        return None
+def encode_vless(uuid: str, host: str, port: int, query: Dict[str, str], tag: str) -> str:
+    query_items = []
+    for k in sorted(query.keys()):
+        query_items.append(f"{quote(str(k))}={quote(str(query[k]))}")
+    query_str = "&".join(query_items)
+    base = f"vless://{uuid}@{host}:{port}"
+    if query_str:
+        base += f"?{query_str}"
+    if tag:
+        base += f"#{quote(tag)}"
+    return base
 
-    # softer reality checks
-    if not p.get("pbk", "").strip():
-        return None
-    if not p.get("sni", "").strip():
-        return None
 
-    candidate.host = clean_host(candidate.host)
-    p["sni"] = clean_host(p.get("sni", ""))
-    p["fp"] = normalize_fp(p.get("fp", "chrome"))
-    p["type"] = "tcp"
-    p["security"] = "reality"
+def score_operator_aware(host: str, port: int, sni: str, fp: str, flow: str, alpn: str, tag: str) -> int:
+    """
+    Heuristic scoring tuned for Iran:
+    - Golden ports are mandatory already, still give differentiation
+    - Good domain-like SNI, "enterprise-like" suffix, not suspicious
+    - flow vision preferred
+    - alpn h2 helpful
+    - host != sni adds slight diversity advantage
+    """
+    score = 0
 
-    if not looks_like_domain(candidate.host):
-        return None
+    # base: reality tcp validated
+    score += 100
 
-    if should_reject_sni(p["sni"]):
-        return None
-
-    if candidate.port in BAD_PORTS:
-        return None
-    if not (1 <= candidate.port <= 65535):
-        return None
-
-    score = 0.0
-
-    if candidate.port == 443:
+    # port weights (still differentiate among golden)
+    if port == 443:
         score += 40
-    elif candidate.port in GOOD_PORTS:
+    elif port in (2053, 2083):
         score += 26
-    else:
-        score += 10
+    elif port == 8443:
+        score += 20
 
-    flow = p.get("flow", "").strip().lower()
-    if flow in GOOD_FLOWS:
-        score += 16
-    elif flow:
+    # sni quality
+    if sni.endswith(PREFERRED_SNI_SUFFIXES):
+        score += 14
+    # longer/more "real" looking domain gets slight bonus (bounded)
+    score += min(max(len(sni) - 10, 0), 12)
+
+    # host/sni mismatch slight plus (cdn-fronting-ish diversity)
+    if clean_host(host) != clean_host(sni):
         score += 6
-    else:
-        score += 3
 
-    if p["fp"] == "chrome":
-        score += 12
-    else:
-        score += 8
+    # mandatory fp=chrome => reward it
+    if fp == "chrome":
+        score += 18
 
-    sni = p["sni"]
-    if sni == candidate.host:
+    if flow == GOOD_FLOW:
+        score += 22
+
+    a = (alpn or "").lower()
+    if "h2" in a:
         score += 6
-    if any(sni.endswith(suf) for suf in PREFERRED_SNI_SUFFIXES):
-        score += 10
-
-    if len(candidate.pbk) >= 20:
-        score += 8
-    else:
+    if "http/1.1" in a:
         score += 2
 
-    if candidate.sid:
-        score += 4
+    if tag:
+        score += 1
 
-    candidate.base_score = score
-    candidate.key = build_candidate_key(candidate.host, candidate.port, candidate.sni, candidate.pbk, candidate.sid)
-    candidate.normalized_url = encode_vless(candidate)
-    return candidate
+    return score
 
 
-def fetch_all() -> tuple[str, list[dict[str, Any]]]:
-    chunks: list[str] = []
-    headers = {"User-Agent": USER_AGENT}
-    source_stats: list[dict[str, Any]] = []
+def validate_and_build(raw_url: str, counters: Dict[str, int]) -> Optional[Candidate]:
+    parsed = parse_vless_url(raw_url)
+    if not parsed:
+        counters["rejected_parse"] += 1
+        return None
 
-    for src in SOURCES:
-        item = {
-            "url": src,
-            "ok": False,
-            "status_code": None,
-            "bytes": 0,
-            "error": "",
-        }
+    uuid, host, port, query, tag = parsed
+
+    security = (query.get("security", "") or "").strip().lower()
+    net = (query.get("type", "") or "").strip().lower()
+    pbk = (query.get("pbk", "") or "").strip()
+    sid = (query.get("sid", "") or "").strip()
+    sni = clean_host((query.get("sni", "") or "").strip())
+    fp = normalize_fp((query.get("fp", "") or "").strip())
+    flow = (query.get("flow", "") or "").strip().lower()
+    alpn = (query.get("alpn", "") or "").strip()
+
+    if security != "reality":
+        counters["rejected_non_reality"] += 1
+        return None
+
+    if net != MANDATORY_NET:
+        counters["rejected_non_tcp"] += 1
+        return None
+
+    # Golden ports strict
+    if port not in GOLDEN_PORTS:
+        counters["rejected_non_golden_port"] += 1
+        return None
+
+    # Mandatory fp=chrome strict
+    if fp != MANDATORY_FP:
+        # includes: missing fp OR different fp
+        counters["rejected_fp_not_chrome"] += 1
+        return None
+
+    # Required keys
+    for k in REALITY_REQUIRED_KEYS:
+        if not (query.get(k, "") or "").strip():
+            counters[f"rejected_missing_{k}"] += 1
+            return None
+
+    # Basic sanity
+    if not uuid:
+        counters["rejected_empty_uuid"] += 1
+        return None
+
+    # Host: allow domain OR ipv4 (some configs use IP host)
+    if not (looks_like_domain(host) or is_ipv4(host)):
+        counters["rejected_bad_host"] += 1
+        return None
+
+    # SNI must be good domain and not suspicious
+    if should_reject_sni(sni):
+        counters["rejected_bad_sni"] += 1
+        return None
+
+    # flow strict: if present must be vision; if missing -> reject (strict mode)
+    # (اگر می‌خواهی flow اختیاری باشد، بگو تا تغییر بدهم)
+    if not flow:
+        counters["rejected_missing_flow"] += 1
+        return None
+    if flow not in ALLOWED_FLOWS:
+        counters["rejected_bad_flow"] += 1
+        return None
+
+    # pbk/sid sanity
+    if len(pbk) < 8:
+        counters["rejected_short_pbk"] += 1
+        return None
+    if len(sid) < 1:
+        counters["rejected_short_sid"] += 1
+        return None
+
+    score = score_operator_aware(host, port, sni, fp, flow, alpn, tag)
+    dedupe_key = build_dedupe_key(host, port, sni, pbk)
+
+    counters["validated_ok"] += 1
+    return Candidate(
+        raw_url=raw_url,
+        uuid=uuid,
+        host=host,
+        port=port,
+        query=query,
+        tag=tag,
+        score=score,
+        dedupe_key=dedupe_key,
+    )
+
+
+def fetch_all() -> Tuple[str, List[dict]]:
+    source_stats = []
+    chunks: List[str] = []
+
+    for url in SOURCES:
+        stat = {"url": url, "ok": False, "status_code": 0, "bytes": 0, "error": ""}
         try:
-            r = requests.get(src, timeout=FETCH_TIMEOUT, headers=headers)
-            item["status_code"] = r.status_code
-            if r.ok and r.text:
-                item["ok"] = True
-                item["bytes"] = len(r.text.encode("utf-8", errors="ignore"))
-                chunks.append(r.text)
-            else:
-                item["error"] = f"http_{r.status_code}"
+            r = requests.get(url, timeout=FETCH_TIMEOUT, headers={"User-Agent": UA})
+            stat["status_code"] = r.status_code
+            if r.status_code != 200:
+                stat["error"] = f"http_{r.status_code}"
+                source_stats.append(stat)
+                continue
+
+            body = r.text or ""
+            body = maybe_decode_body(body)
+            stat["bytes"] = len(body.encode("utf-8", errors="ignore"))
+            stat["ok"] = True
+            chunks.append(body)
+            source_stats.append(stat)
         except Exception as e:
-            item["error"] = f"{type(e).__name__}: {e}"
-        source_stats.append(item)
+            stat["error"] = str(e)[:300]
+            source_stats.append(stat)
 
     return "\n".join(chunks), source_stats
 
 
-def extract_vless_links(text: str) -> list[str]:
-    if not text:
-        return []
-    return re.findall(r"vless://[^\s\"'<>]+", text, flags=re.IGNORECASE)
-
-
-async def resolve_host(host: str) -> tuple[bool, float | None]:
-    loop = asyncio.get_running_loop()
-    t0 = time.perf_counter()
-    try:
-        await asyncio.wait_for(loop.getaddrinfo(host, None, proto=socket.IPPROTO_TCP), timeout=DNS_TIMEOUT)
-        return True, (time.perf_counter() - t0) * 1000
-    except Exception:
-        return False, None
-
-
-async def tcp_probe(host: str, port: int) -> tuple[bool, float | None]:
-    t0 = time.perf_counter()
-    try:
-        reader, writer = await asyncio.wait_for(asyncio.open_connection(host, port), timeout=TCP_TIMEOUT)
-        writer.close()
-        try:
-            await writer.wait_closed()
-        except Exception:
-            pass
-        return True, (time.perf_counter() - t0) * 1000
-    except Exception:
-        return False, None
-
-
-async def light_live_test_one(candidate: Candidate, sem: asyncio.Semaphore) -> tuple[str, float]:
-    async with sem:
-        if LIVE_TEST_MODE == "off":
-            return candidate.key, 0.0
-
-        if LIVE_TEST_MODE == "dns":
-            ok, ms = await resolve_host(candidate.host)
-            if not ok:
-                return candidate.key, -8.0
-            if ms is not None and ms < 150:
-                return candidate.key, 10.0
-            return candidate.key, 6.0
-
-        # tcp mode
-        ok, ms = await tcp_probe(candidate.host, candidate.port)
-        if not ok:
-            return candidate.key, -10.0
-        if ms is not None and ms < 250:
-            return candidate.key, 16.0
-        return candidate.key, 10.0
-
-
-async def run_live_phase(candidates: list[Candidate]) -> dict[str, float]:
-    if not candidates or LIVE_TEST_MODE == "off":
-        return {}
-
-    sem = asyncio.Semaphore(LIVE_TEST_WORKERS)
-    tasks = [asyncio.create_task(light_live_test_one(c, sem)) for c in candidates]
-    results: dict[str, float] = {}
-    done = await asyncio.gather(*tasks, return_exceptions=True)
-
-    for item in done:
-        if isinstance(item, Exception):
-            continue
-        key, score = item
-        results[key] = score
-
-    return results
-
-
-def phase1_build_candidates(text: str) -> tuple[list[Candidate], int]:
-    links = extract_vless_links(text)
-    best_by_key: dict[str, Candidate] = {}
-
-    for link in links:
-        parsed = parse_vless_url(link)
-        if not parsed:
-            continue
-
-        scored = validate_and_score(parsed)
-        if not scored:
-            continue
-
-        current = best_by_key.get(scored.key)
-        if current is None or scored.base_score > current.base_score:
-            best_by_key[scored.key] = scored
-
-    items = list(best_by_key.values())
-    items.sort(key=lambda x: x.base_score, reverse=True)
-    return items, len(links)
-
-
-def rerank_candidates(candidates: list[Candidate], live_scores: dict[str, float]) -> list[Candidate]:
-    ranked: list[Candidate] = []
-
+def dedupe_best_by_key(candidates: List[Candidate], counters: Dict[str, int]) -> List[Candidate]:
+    best: Dict[str, Candidate] = {}
     for c in candidates:
-        c.live_score = live_scores.get(c.key, 0.0)
-        c.final_score = c.base_score + c.live_score
-        ranked.append(c)
+        prev = best.get(c.dedupe_key)
+        if prev is None:
+            best[c.dedupe_key] = c
+        else:
+            counters["dedupe_collisions"] += 1
+            if c.score > prev.score:
+                best[c.dedupe_key] = c
+    return list(best.values())
 
-    ranked.sort(key=lambda x: (x.final_score, x.base_score), reverse=True)
-    return ranked
 
+def final_select(candidates: List[Candidate], counters: Dict[str, int]) -> List[Candidate]:
+    ranked = sorted(
+        candidates,
+        key=lambda c: (-c.score, c.host, c.port, c.tag)
+    )
 
-def final_select(candidates: list[Candidate]) -> list[Candidate]:
-    selected: list[Candidate] = []
-    per_host: defaultdict[str, int] = defaultdict(int)
+    selected: List[Candidate] = []
+    per_host: Dict[str, int] = {}
 
-    for c in candidates:
-        if per_host[c.host] >= MAX_PER_HOST:
+    for c in ranked:
+        cnt = per_host.get(c.host, 0)
+        if cnt >= MAX_PER_HOST:
+            counters["rejected_host_cap"] += 1
             continue
         selected.append(c)
-        per_host[c.host] += 1
+        per_host[c.host] = cnt + 1
         if len(selected) >= MAX_OUTPUT:
             break
 
+    counters["selected_final"] = len(selected)
     return selected
 
 
-def write_output(candidates: list[Candidate]) -> None:
-    with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
-        for c in candidates:
-            f.write(c.normalized_url + "\n")
+def write_output(candidates: List[Candidate]) -> None:
+    lines = [
+        encode_vless(c.uuid, c.host, c.port, c.query, c.tag)
+        for c in candidates
+    ]
+    with open(OUTPUT_FILE, "w", encoding="utf-8", newline="\n") as f:
+        if lines:
+            f.write("\n".join(lines) + "\n")
+        else:
+            f.write("")
 
 
-def write_telemetry(data: dict[str, Any]) -> None:
+def write_telemetry(data: dict) -> None:
     with open(TELEMETRY_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
 
-def process() -> dict[str, Any]:
-    t0 = time.perf_counter()
+def process() -> dict:
+    started = time.time()
+
+    counters = {
+        "rejected_parse": 0,
+        "rejected_non_reality": 0,
+        "rejected_non_tcp": 0,
+        "rejected_non_golden_port": 0,
+        "rejected_fp_not_chrome": 0,
+        "rejected_missing_pbk": 0,
+        "rejected_missing_sid": 0,
+        "rejected_missing_sni": 0,
+        "rejected_empty_uuid": 0,
+        "rejected_bad_host": 0,
+        "rejected_bad_sni": 0,
+        "rejected_missing_flow": 0,
+        "rejected_bad_flow": 0,
+        "rejected_short_pbk": 0,
+        "rejected_short_sid": 0,
+        "validated_ok": 0,
+        "dedupe_collisions": 0,
+        "rejected_host_cap": 0,
+        "selected_final": 0,
+    }
 
     raw_text, source_stats = fetch_all()
-    phase1_candidates, extracted_links = phase1_build_candidates(raw_text)
+    extracted_links = extract_vless_links(raw_text)
 
-    top_for_live = phase1_candidates[:PHASE2_CANDIDATES]
+    validated: List[Candidate] = []
+    for link in extracted_links:
+        c = validate_and_build(link, counters)
+        if c is not None:
+            validated.append(c)
 
-    live_scores: dict[str, float] = {}
-    if LIVE_TEST_ENABLED and top_for_live:
-        try:
-            live_scores = asyncio.run(run_live_phase(top_for_live))
-        except Exception:
-            live_scores = {}
+    deduped = dedupe_best_by_key(validated, counters)
+    selected = final_select(deduped, counters)
 
-    reranked = rerank_candidates(phase1_candidates, live_scores)
-    final_items = final_select(reranked)
-
-    # fallback: never publish empty if validated candidates exist
-    if not final_items and phase1_candidates:
-        final_items = final_select(phase1_candidates)
-
-    write_output(final_items)
-
-    elapsed = round(time.perf_counter() - t0, 3)
+    write_output(selected)
 
     summary = {
         "version": VERSION,
         "sources_total": len(SOURCES),
         "sources_ok": sum(1 for s in source_stats if s["ok"]),
         "source_stats": source_stats,
-        "raw_text_size": len(raw_text),
-        "extracted_links": extracted_links,
-        "validated_candidates": len(phase1_candidates),
-        "phase2_candidates": len(top_for_live),
-        "live_results": len(live_scores),
-        "final_output": len(final_items),
-        "live_test_enabled": LIVE_TEST_ENABLED,
-        "live_test_mode": LIVE_TEST_MODE,
+
+        "raw_text_size": len(raw_text.encode("utf-8", errors="ignore")),
+        "extracted_links": len(extracted_links),
+
+        "validated_candidates": len(validated),
+        "deduped_candidates": len(deduped),
+        "final_output": len(selected),
+
+        "max_output": MAX_OUTPUT,
+        "max_per_host": MAX_PER_HOST,
+
+        "golden_ports": sorted(list(GOLDEN_PORTS)),
+        "mandatory_fp": MANDATORY_FP,
+        "mandatory_net": MANDATORY_NET,
+        "live_test_enabled": False,
+
+        "counters": counters,
+
         "output_file": OUTPUT_FILE,
-        "elapsed_sec": elapsed,
+        "telemetry_file": TELEMETRY_FILE,
+        "elapsed_sec": round(time.time() - started, 3),
     }
 
     write_telemetry(summary)
