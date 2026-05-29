@@ -3,7 +3,7 @@ name: Mojtaba Reality Update V7
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 * * * *'
+    - cron: '0 */3 * * *'
 
 permissions:
   contents: write
@@ -20,7 +20,7 @@ env:
 jobs:
   surge:
     name: Run Surgeon
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
 
     steps:
@@ -36,38 +36,7 @@ jobs:
           cache: 'pip'
           cache-dependency-path: 'requirements.txt'
 
-      - name: ⏱️ Check 3-Hour Gate
-        id: gate
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          NOW=$(date -u +%s)
-          FILE=".last_successful_update"
-
-          if [[ ! -f "$FILE" ]]; then
-            echo "No previous timestamp found. Allowing run."
-            echo "should_run=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          LAST_RAW="$(tr -d '\r\n' < "$FILE")"
-          LAST=$(date -u -d "$LAST_RAW" +%s 2>/dev/null || echo 0)
-          DIFF=$((NOW - LAST))
-
-          echo "Last successful update: $LAST_RAW"
-          echo "Elapsed since last update: $DIFF seconds"
-
-          if [[ "$DIFF" -ge 10800 ]]; then
-            echo "3 hours passed. Running workflow."
-            echo "should_run=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "Less than 3 hours. Skipping."
-            echo "should_run=false" >> "$GITHUB_OUTPUT"
-          fi
-
       - name: 📦 Install Dependencies
-        if: steps.gate.outputs.should_run == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -75,21 +44,21 @@ jobs:
           python -m pip install -r requirements.txt
 
       - name: ⚙️ Run Surgeon
-        if: steps.gate.outputs.should_run == 'true'
         shell: bash
         run: |
           set -euo pipefail
           python surgeon.py
 
-      - name: 📝 Update Timestamp
-        if: steps.gate.outputs.should_run == 'true'
+      - name: ✅ Fail if output is empty
         shell: bash
         run: |
           set -euo pipefail
-          date -u +"%Y-%m-%dT%H:%M:%SZ" > .last_successful_update
+          if [[ ! -s MOJTABA_CLEAN_LIST.txt ]]; then
+            echo "MOJTABA_CLEAN_LIST.txt is empty."
+            exit 1
+          fi
 
       - name: 📤 Commit & Push
-        if: steps.gate.outputs.should_run == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -99,7 +68,6 @@ jobs:
 
           git add MOJTABA_CLEAN_LIST.txt
           [[ -f surgeon_telemetry.json ]] && git add surgeon_telemetry.json || true
-          git add .last_successful_update
 
           if git diff --cached --quiet; then
             echo "✅ No changes to commit."
