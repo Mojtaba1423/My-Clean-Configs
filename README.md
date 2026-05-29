@@ -1,9 +1,9 @@
 <br>
 
 <div align="center">
-  <img src="https://capsule-render.vercel.app/api?type=rounded&height=160&color=gradient&text=Mojtaba%20Reality%20Surgeon%20V7.0&fontAlign=50&fontAlignY=50&fontSize=40" />
+  <img src="https://capsule-render.vercel.app/api?type=rounded&height=160&color=gradient&text=Mojtaba%20Reality%20Surgeon%20V7.3&fontAlign=50&fontAlignY=50&fontSize=40" />
   
-  <p><b>پایپ‌لاین خودکار جراحی، بهینه‌سازی، تست سبک و فیلترینگ هوشمند کانفیگ‌های Reality برای اپراتورهای ایران</b></p>
+  <p><b>پایپ‌لاین خودکار جراحی، پالایش، انتخاب و فیلترینگ هوشمند کانفیگ‌های Reality برای اپراتورهای ایران</b></p>
 </div>
 
 <div align="center">
@@ -11,7 +11,7 @@
 [![Status](https://img.shields.io/badge/Status-Active-brightgreen?style=for-the-badge)]()
 [![Update](https://img.shields.io/badge/Update-Every%203%20Hours-blue?style=for-the-badge)]()
 [![Python](https://img.shields.io/badge/Python-3.13-aff?style=for-the-badge&logo=python)]()
-[![Telemetry](https://img.shields.io/badge/Telemetry-V7.0--Enabled-orange?style=for-the-badge)]()
+[![Telemetry](https://img.shields.io/badge/Telemetry-V7.3--Enabled-orange?style=for-the-badge)]()
 
 </div>
 
@@ -21,7 +21,7 @@
 
 ## 🧐 این پروژه چیست؟
 
-این پروژه یک سیستم اتوماسیون کامل (Pipeline) است. اسکریپت اختصاصی **The Surgeon V7.0** (جراح) کانفیگ‌های خام را از سورس‌های مختلف جمع‌آوری می‌کند، ترافیک Reality را ایزوله می‌کند، با اعمال فیلترهای سخت‌گیرانه روی پورت‌ها و پارامترها نودهای ضعیف یا ناسازگار را حذف می‌کند، سپس با **لایو تست سبک** روی کاندیدهای برتر، نودهایی را انتخاب می‌کند که بیشترین شانس عبور از DPI و بیشترین پایداری روی اینترنت **مخابرات، همراه اول و ایرانسل** را داشته باشند.
+این پروژه یک سیستم اتوماسیون کامل (Pipeline) است. اسکریپت اختصاصی **The Surgeon V7.3** (جراح) کانفیگ‌های خام را از سورس‌های مختلف جمع‌آوری می‌کند، ترافیک Reality را ایزوله می‌کند، با اعمال فیلترهای سخت‌گیرانه روی پورت‌ها و پارامترها نودهای ضعیف یا ناسازگار را حذف می‌کند، سپس با رتبه‌بندی و انتخاب هوشمند، نودهایی را نگه می‌دارد که بیشترین شانس پایداری و سازگاری روی اینترنت **مخابرات، همراه اول و ایرانسل** را داشته باشند.
 
 این سیستم هر **۳ ساعت یک‌بار** به‌طور خودکار روی GitHub Actions با استفاده از پایتون نسخه **3.13** اجرا شده و لیست نهایی را در فایل `MOJTABA_CLEAN_LIST.txt` به‌روزرسانی می‌کند.
 
@@ -30,7 +30,7 @@
 <br>
 
 <div align="center">
-  <h3 style="color: #00D2FF;">🚀 قابلیت‌های کلیدی (Key Features - V7.0)</h3>
+  <h3 style="color: #00D2FF;">🚀 قابلیت‌های کلیدی (Key Features - V7.3)</h3>
   <table dir="rtl" style="margin-left: auto; margin-right: auto; border-radius: 10px; overflow: hidden;">
     <thead>
       <tr style="background-color: #21262d;">
@@ -57,13 +57,13 @@
       </tr>
       <tr>
         <td align="center"><b>Operator-Aware Ranking</b></td>
-        <td align="center">امتیازدهی بر اساس کیفیت SNI، پورت، ساختار و شانس عبور در شبکه ایران</td>
+        <td align="center">امتیازدهی بر اساس کیفیت SNI، پورت، ساختار و شانس سازگاری در شبکه ایران</td>
         <td align="center">انتخاب هوشمندتر برای استفاده روزمره</td>
       </tr>
       <tr>
-        <td align="center"><b>Light Live Probe</b></td>
-        <td align="center">تست سبک <code>DNS</code> / <code>TCP</code> / <code>TLS</code> / <code>HTTP</code> روی کاندیدهای برتر با timeout کوتاه</td>
-        <td align="center">کاهش false positive و انتخاب نودهای usable‌تر</td>
+        <td align="center"><b>Strict Reality Filtering</b></td>
+        <td align="center">فیلتر دقیق کانفیگ‌ها بر اساس ساختار معتبر و پارامترهای ضروری Reality</td>
+        <td align="center">خروجی تمیزتر و usable‌تر</td>
       </tr>
       <tr>
         <td align="center"><b>Failure Telemetry</b></td>
@@ -86,17 +86,16 @@
 ## 📜 تاریخچه تغییرات
 
 <details open>
-<summary><b><font color="#00D2FF">نسخه V7.0 (2026-05-29) - بازنویسی کامل و تست سبک واقعی‌تر</font></b></summary>
+<summary><b><font color="#00D2FF">نسخه V7.3 (2026-05-29) - پالایش سخت‌گیرانه و انتخاب هوشمندتر</font></b></summary>
 <br>
 <ul>
-  <li><b>Full Pipeline Rewrite:</b> بازنویسی کامل ساختار پردازش برای انتخاب دقیق‌تر و خروجی تمیزتر.</li>
-  <li><b>Light Live Testing:</b> اضافه شدن فاز تست سبک واقعی شامل <code>DNS</code>، <code>TCP</code>، <code>TLS</code> و <code>HTTP Probe</code> روی کاندیدهای برتر.</li>
-  <li><b>Four-Phase Selection:</b> طراحی انتخاب چندمرحله‌ای شامل فیلتر اولیه، تست سبک، رتبه‌بندی مجدد و خروجی نهایی.</li>
-  <li><b>Final Output Tuning:</b> محدودسازی خروجی نهایی به حداکثر <code>96</code> کانفیگ usable و تمیز.</li>
-  <li><b>Candidate Expansion:</b> افزایش محدوده بررسی برای انتخاب بهتر کاندیدهای فاز تست.</li>
+  <li><b>Full Pipeline Refinement:</b> بهبود ساختار کلی پردازش برای انتخاب دقیق‌تر و خروجی تمیزتر.</li>
+  <li><b>Strict Reality Filtering:</b> اعمال فیلتر سخت‌گیرانه‌تر روی ساختار و پارامترهای Reality.</li>
+  <li><b>Operator-Aware Selection:</b> انتخاب بهتر کانفیگ‌ها با تمرکز بر سازگاری بیشتر در شبکه ایران.</li>
+  <li><b>Final Output Tuning:</b> بهینه‌سازی لیست نهایی برای usable بودن بیشتر و نویز کمتر.</li>
   <li><b>Host Diversity:</b> جلوگیری از تکرار بیش از حد کانفیگ‌های وابسته به یک میزبان.</li>
-  <li><b>GitHub Actions Refresh:</b> به‌روزرسانی workflow برای اجرا روی <code>ubuntu-latest</code>، پایتون <code>3.13</code> و سازگاری بهتر با Node24.</li>
-  <li><b>3-Hour Smart Gate:</b> تثبیت اجرای واقعی هر ۳ ساعت با وجود trigger ساعتی برای پایداری بیشتر.</li>
+  <li><b>GitHub Actions Refresh:</b> به‌روزرسانی workflow برای اجرا روی <code>ubuntu-latest</code> و پایتون <code>3.13</code>.</li>
+  <li><b>3-Hour Smart Update Cycle:</b> تثبیت بروزرسانی منظم هر ۳ ساعت.</li>
   <li><b>Single Clean Output:</b> تمرکز خروجی روی فایل نهایی <code>MOJTABA_CLEAN_LIST.txt</code>.</li>
   <li><b>Bug Fixes:</b> رفع باگ 😄</li>
 </ul>
@@ -114,7 +113,7 @@
 <summary><b><font color="#999">نسخه V6.0 (2026-05-29)</font></b></summary>
 <br>
 <ul>
-  <li>آماده‌سازی زیرساخت داخلی برای تست فعال و انتخاب دقیق‌تر کانفیگ‌ها.</li>
+  <li>آماده‌سازی زیرساخت داخلی برای انتخاب دقیق‌تر کانفیگ‌ها.</li>
 </ul>
 </details>
 
@@ -156,6 +155,6 @@
 </div>
 
 <div align="center" dir="ltr">
-  
 ```https
+
 https://raw.githubusercontent.com/Mojtaba1423/My-Clean-Configs/main/MOJTABA_CLEAN_LIST.txt
