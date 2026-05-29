@@ -1,78 +1,61 @@
-name: Mojtaba Reality Update V7
+name: Mojtaba Reality Update V7.3
 
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 */3 * * *'
+    - cron: "0 */3 * * *"
 
 permissions:
   contents: write
 
-concurrency:
-  group: mojtaba-reality-update
-  cancel-in-progress: false
-
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-  PYTHONUNBUFFERED: "1"
-  PIP_DISABLE_PIP_VERSION_CHECK: "1"
-
 jobs:
-  surge:
-    name: Run Surgeon
+  update:
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
-
     steps:
-      - name: 🚀 Checkout Repository
+      - name: Checkout
         uses: actions/checkout@v5
-        with:
-          fetch-depth: 0
 
-      - name: 🐍 Set up Python 3.13
+      - name: Setup Python
         uses: actions/setup-python@v6
         with:
-          python-version: '3.13'
-          cache: 'pip'
-          cache-dependency-path: 'requirements.txt'
+          python-version: "3.13"
 
-      - name: 📦 Install Dependencies
-        shell: bash
+      - name: Install dependencies
         run: |
-          set -euo pipefail
           python -m pip install --upgrade pip
-          python -m pip install -r requirements.txt
+          pip install -r requirements.txt
 
-      - name: ⚙️ Run Surgeon
-        shell: bash
+      - name: Run Surgeon
         run: |
-          set -euo pipefail
           python surgeon.py
 
-      - name: ✅ Fail if output is empty
-        shell: bash
+      - name: Fail if output is empty
         run: |
-          set -euo pipefail
           if [[ ! -s MOJTABA_CLEAN_LIST.txt ]]; then
             echo "MOJTABA_CLEAN_LIST.txt is empty."
             exit 1
           fi
 
-      - name: 📤 Commit & Push
-        shell: bash
+      - name: Update Timestamp
         run: |
-          set -euo pipefail
+          date +%s > .last_successful_update
 
+      - name: Commit & Push
+        run: |
           git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          git add MOJTABA_CLEAN_LIST.txt
-          [[ -f surgeon_telemetry.json ]] && git add surgeon_telemetry.json || true
+          git add MOJTABA_CLEAN_LIST.txt .last_successful_update
+
+          # telemetry may or may not exist (but in our surgeon it will)
+          if [[ -f surgeon_telemetry.json ]]; then
+            git add surgeon_telemetry.json
+          fi
 
           if git diff --cached --quiet; then
-            echo "✅ No changes to commit."
+            echo "No changes to commit."
             exit 0
           fi
 
-          git commit -m "Auto Update: $(date -u +'%Y-%m-%d %H:%M:%S UTC')"
+          git commit -m "Update reality list (V7.3)"
           git push
