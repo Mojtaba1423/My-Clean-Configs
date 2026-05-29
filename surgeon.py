@@ -74,6 +74,11 @@ ALLOWED_FLOWS = {GOOD_FLOW}
 
 UA = "Mozilla/5.0 (X11; Linux x86_64) MojtabaRealitySurgeon/7.3"
 
+# ---- Dark Luxury / Dark Sexy naming theme ----
+TOP_5_LABEL = "🕯️🖤 Mojtaba1423"
+BEST_NEXT_LABEL = "🌙🥀 @mojtaba_1423"
+REST_LABEL = "🍷🦂 M_1423"
+
 
 @dataclass
 class Candidate:
@@ -213,6 +218,23 @@ def build_dedupe_key(host: str, port: int, sni: str, pbk: str) -> str:
     # Multi-layer dedupe per spec: IP(or host):Port + SNI + PBK
     # If host is an IP, it's already IP. Otherwise host is domain (we can't resolve IP offline here).
     return f"{clean_host(host)}:{port}|{clean_host(sni)}|{(pbk or '').strip()}"
+
+
+def build_rank_label(rank: int) -> str:
+    if rank <= 5:
+        return TOP_5_LABEL
+    elif rank <= 15:
+        return BEST_NEXT_LABEL
+    return REST_LABEL
+
+
+def decorate_tag(rank: int, original_tag: str, score: int, port: int) -> str:
+    label = build_rank_label(rank)
+    base_tag = (original_tag or "").strip()
+
+    if base_tag:
+        return f"{label} | {base_tag} | score:{score} | :{port}"
+    return f"{label} | score:{score} | :{port}"
 
 
 def encode_vless(uuid: str, host: str, port: int, query: Dict[str, str], tag: str) -> str:
@@ -433,10 +455,16 @@ def final_select(candidates: List[Candidate], counters: Dict[str, int]) -> List[
 
 
 def write_output(candidates: List[Candidate]) -> None:
-    lines = [
-        encode_vless(c.uuid, c.host, c.port, c.query, c.tag)
-        for c in candidates
-    ]
+    lines = []
+    for idx, c in enumerate(candidates, start=1):
+        final_tag = decorate_tag(
+            rank=idx,
+            original_tag=c.tag,
+            score=c.score,
+            port=c.port,
+        )
+        lines.append(encode_vless(c.uuid, c.host, c.port, c.query, final_tag))
+
     with open(OUTPUT_FILE, "w", encoding="utf-8", newline="\n") as f:
         if lines:
             f.write("\n".join(lines) + "\n")
