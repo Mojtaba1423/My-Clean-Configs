@@ -14,7 +14,7 @@
       "url": "https://raw.githubusercontent.com/mahdibland/ShadowsocksAggregator/master/Eternity.txt",
       "ok": true,
       "status_code": 200,
-      "bytes": 42315,
+      "bytes": 41997,
       "error": ""
     },
     {
@@ -35,14 +35,14 @@
       "url": "https://raw.githubusercontent.com/barry-far/V2ray-Config/refs/heads/main/All_Configs_Sub.txt",
       "ok": true,
       "status_code": 200,
-      "bytes": 873175,
+      "bytes": 874310,
       "error": ""
     },
     {
       "url": "https://raw.githubusercontent.com/SoliSpirit/v2ray-configs/refs/heads/main/Protocols/vless.txt",
       "ok": true,
       "status_code": 200,
-      "bytes": 962871,
+      "bytes": 882063,
       "error": ""
     },
     {
@@ -63,15 +63,15 @@
       "url": "https://raw.githubusercontent.com/iboxz/free-v2ray-collector/refs/heads/main/main/vless.txt",
       "ok": true,
       "status_code": 200,
-      "bytes": 66817,
+      "bytes": 70714,
       "error": ""
     }
   ],
-  "raw_text_size": 1969430,
-  "extracted_links": 7473,
-  "validated_candidates": 315,
-  "deduped_candidates": 146,
-  "final_output": 128,
+  "raw_text_size": 1893336,
+  "extracted_links": 7128,
+  "validated_candidates": 286,
+  "deduped_candidates": 120,
+  "final_output": 119,
   "max_output": 128,
   "max_per_host": 2,
   "golden_ports": [
@@ -85,26 +85,26 @@
   "live_test_enabled": false,
   "counters": {
     "rejected_parse": 11,
-    "rejected_non_reality": 6482,
-    "rejected_non_tcp": 177,
-    "rejected_non_golden_port": 265,
-    "rejected_fp_not_chrome": 119,
+    "rejected_non_reality": 6264,
+    "rejected_non_tcp": 155,
+    "rejected_non_golden_port": 225,
+    "rejected_fp_not_chrome": 106,
     "rejected_missing_pbk": 0,
-    "rejected_missing_sid": 64,
+    "rejected_missing_sid": 48,
     "rejected_missing_sni": 6,
     "rejected_empty_uuid": 0,
     "rejected_bad_host": 0,
-    "rejected_bad_sni": 2,
-    "rejected_missing_flow": 32,
+    "rejected_bad_sni": 0,
+    "rejected_missing_flow": 27,
     "rejected_bad_flow": 0,
     "rejected_short_pbk": 0,
     "rejected_short_sid": 0,
-    "validated_ok": 315,
-    "dedupe_collisions": 169,
+    "validated_ok": 286,
+    "dedupe_collisions": 166,
     "rejected_host_cap": 1,
-    "selected_final": 128
+    "selected_final": 119
   },
   "output_file": "MOJTABA_CLEAN_LIST.txt",
   "telemetry_file": "surgeon_telemetry.json",
-  "elapsed_sec": 2.159
+  "elapsed_sec": 1.166
 }
