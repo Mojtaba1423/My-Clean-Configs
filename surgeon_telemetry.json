@@ -35,14 +35,14 @@
       "url": "https://raw.githubusercontent.com/barry-far/V2ray-Config/refs/heads/main/All_Configs_Sub.txt",
       "ok": true,
       "status_code": 200,
-      "bytes": 678005,
+      "bytes": 710771,
       "error": ""
     },
     {
       "url": "https://raw.githubusercontent.com/SoliSpirit/v2ray-configs/refs/heads/main/Protocols/vless.txt",
       "ok": true,
       "status_code": 200,
-      "bytes": 696879,
+      "bytes": 684438,
       "error": ""
     },
     {
@@ -67,9 +67,9 @@
       "error": ""
     }
   ],
-  "raw_text_size": 1511318,
-  "extracted_links": 5432,
-  "validated_candidates": 133,
+  "raw_text_size": 1531643,
+  "extracted_links": 5385,
+  "validated_candidates": 136,
   "deduped_candidates": 61,
   "final_output": 61,
   "max_output": 128,
@@ -84,27 +84,27 @@
   "mandatory_net": "tcp",
   "live_test_enabled": false,
   "counters": {
-    "rejected_parse": 9,
-    "rejected_non_reality": 4714,
-    "rejected_non_tcp": 146,
-    "rejected_non_golden_port": 247,
-    "rejected_fp_not_chrome": 123,
+    "rejected_parse": 10,
+    "rejected_non_reality": 4629,
+    "rejected_non_tcp": 164,
+    "rejected_non_golden_port": 267,
+    "rejected_fp_not_chrome": 136,
     "rejected_missing_pbk": 0,
-    "rejected_missing_sid": 24,
+    "rejected_missing_sid": 17,
     "rejected_missing_sni": 0,
     "rejected_empty_uuid": 0,
     "rejected_bad_host": 0,
     "rejected_bad_sni": 0,
-    "rejected_missing_flow": 36,
+    "rejected_missing_flow": 26,
     "rejected_bad_flow": 0,
     "rejected_short_pbk": 0,
     "rejected_short_sid": 0,
-    "validated_ok": 133,
-    "dedupe_collisions": 72,
+    "validated_ok": 136,
+    "dedupe_collisions": 75,
     "rejected_host_cap": 0,
     "selected_final": 61
   },
   "output_file": "MOJTABA_CLEAN_LIST.txt",
   "telemetry_file": "surgeon_telemetry.json",
-  "elapsed_sec": 1.434
+  "elapsed_sec": 0.853
 }
