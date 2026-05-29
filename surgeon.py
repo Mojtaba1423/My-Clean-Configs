@@ -232,9 +232,7 @@ def decorate_tag(rank: int, original_tag: str, score: int, port: int) -> str:
     label = build_rank_label(rank)
     base_tag = (original_tag or "").strip()
 
-    if base_tag:
-        return f"{label} | {base_tag} | score:{score} | :{port}"
-    return f"{label} | score:{score} | :{port}"
+    return f"{label} | score:{score}"
 
 
 def encode_vless(uuid: str, host: str, port: int, query: Dict[str, str], tag: str) -> str:
