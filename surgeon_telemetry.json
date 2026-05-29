@@ -1,0 +1,110 @@
+{
+  "version": "7.3",
+  "sources_total": 9,
+  "sources_ok": 6,
+  "source_stats": [
+    {
+      "url": "https://raw.githubusercontent.com/soroushmirzaei/telegram-configs-collector/main/protocols/vless",
+      "ok": false,
+      "status_code": 404,
+      "bytes": 0,
+      "error": "http_404"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/mahdibland/ShadowsocksAggregator/master/Eternity.txt",
+      "ok": true,
+      "status_code": 200,
+      "bytes": 42517,
+      "error": ""
+    },
+    {
+      "url": "https://raw.githubusercontent.com/itsyebekhe/HiN-VPN/main/subscription/normal/mix",
+      "ok": false,
+      "status_code": 404,
+      "bytes": 0,
+      "error": "http_404"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/barry-far/V2ray-Configs/main/All_Configs_Sub.txt",
+      "ok": false,
+      "status_code": 404,
+      "bytes": 0,
+      "error": "http_404"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/barry-far/V2ray-Config/refs/heads/main/All_Configs_Sub.txt",
+      "ok": true,
+      "status_code": 200,
+      "bytes": 871723,
+      "error": ""
+    },
+    {
+      "url": "https://raw.githubusercontent.com/SoliSpirit/v2ray-configs/refs/heads/main/Protocols/vless.txt",
+      "ok": true,
+      "status_code": 200,
+      "bytes": 898313,
+      "error": ""
+    },
+    {
+      "url": "https://raw.githubusercontent.com/mrvcoder/V2rayCollector/refs/heads/main/vless_iran.txt",
+      "ok": true,
+      "status_code": 200,
+      "bytes": 23385,
+      "error": ""
+    },
+    {
+      "url": "https://raw.githubusercontent.com/jafarm83/ConfigV2Ray/refs/heads/main/jafar_ultimate.txt",
+      "ok": true,
+      "status_code": 200,
+      "bytes": 862,
+      "error": ""
+    },
+    {
+      "url": "https://raw.githubusercontent.com/iboxz/free-v2ray-collector/refs/heads/main/main/vless.txt",
+      "ok": true,
+      "status_code": 200,
+      "bytes": 66557,
+      "error": ""
+    }
+  ],
+  "raw_text_size": 1903362,
+  "extracted_links": 7166,
+  "validated_candidates": 184,
+  "deduped_candidates": 94,
+  "final_output": 94,
+  "max_output": 128,
+  "max_per_host": 2,
+  "golden_ports": [
+    443,
+    2053,
+    2083,
+    8443
+  ],
+  "mandatory_fp": "chrome",
+  "mandatory_net": "tcp",
+  "live_test_enabled": false,
+  "counters": {
+    "rejected_parse": 9,
+    "rejected_non_reality": 6352,
+    "rejected_non_tcp": 150,
+    "rejected_non_golden_port": 280,
+    "rejected_fp_not_chrome": 127,
+    "rejected_missing_pbk": 0,
+    "rejected_missing_sid": 29,
+    "rejected_missing_sni": 2,
+    "rejected_empty_uuid": 0,
+    "rejected_bad_host": 0,
+    "rejected_bad_sni": 2,
+    "rejected_missing_flow": 31,
+    "rejected_bad_flow": 0,
+    "rejected_short_pbk": 0,
+    "rejected_short_sid": 0,
+    "validated_ok": 184,
+    "dedupe_collisions": 90,
+    "rejected_host_cap": 0,
+    "selected_final": 94
+  },
+  "output_file": "MOJTABA_CLEAN_LIST.txt",
+  "telemetry_file": "surgeon_telemetry.json",
+  "elapsed_sec": 1.203
+}
