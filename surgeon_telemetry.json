@@ -35,14 +35,14 @@
       "url": "https://raw.githubusercontent.com/barry-far/V2ray-Config/refs/heads/main/All_Configs_Sub.txt",
       "ok": true,
       "status_code": 200,
-      "bytes": 698672,
+      "bytes": 717838,
       "error": ""
     },
     {
       "url": "https://raw.githubusercontent.com/SoliSpirit/v2ray-configs/refs/heads/main/Protocols/vless.txt",
       "ok": true,
       "status_code": 200,
-      "bytes": 660771,
+      "bytes": 667928,
       "error": ""
     },
     {
@@ -63,15 +63,15 @@
       "url": "https://raw.githubusercontent.com/iboxz/free-v2ray-collector/refs/heads/main/main/vless.txt",
       "ok": true,
       "status_code": 200,
-      "bytes": 69372,
+      "bytes": 66366,
       "error": ""
     }
   ],
-  "raw_text_size": 1495399,
-  "extracted_links": 5184,
-  "validated_candidates": 176,
-  "deduped_candidates": 80,
-  "final_output": 80,
+  "raw_text_size": 1518716,
+  "extracted_links": 5246,
+  "validated_candidates": 159,
+  "deduped_candidates": 68,
+  "final_output": 68,
   "max_output": 128,
   "max_per_host": 2,
   "golden_ports": [
@@ -85,26 +85,26 @@
   "live_test_enabled": false,
   "counters": {
     "rejected_parse": 9,
-    "rejected_non_reality": 4338,
-    "rejected_non_tcp": 160,
-    "rejected_non_golden_port": 324,
-    "rejected_fp_not_chrome": 120,
+    "rejected_non_reality": 4421,
+    "rejected_non_tcp": 152,
+    "rejected_non_golden_port": 294,
+    "rejected_fp_not_chrome": 133,
     "rejected_missing_pbk": 0,
-    "rejected_missing_sid": 23,
-    "rejected_missing_sni": 4,
+    "rejected_missing_sid": 36,
+    "rejected_missing_sni": 0,
     "rejected_empty_uuid": 0,
     "rejected_bad_host": 0,
     "rejected_bad_sni": 2,
-    "rejected_missing_flow": 28,
+    "rejected_missing_flow": 40,
     "rejected_bad_flow": 0,
     "rejected_short_pbk": 0,
     "rejected_short_sid": 0,
-    "validated_ok": 176,
-    "dedupe_collisions": 96,
+    "validated_ok": 159,
+    "dedupe_collisions": 91,
     "rejected_host_cap": 0,
-    "selected_final": 80
+    "selected_final": 68
   },
   "output_file": "MOJTABA_CLEAN_LIST.txt",
   "telemetry_file": "surgeon_telemetry.json",
-  "elapsed_sec": 0.7
+  "elapsed_sec": 1.163
 }
