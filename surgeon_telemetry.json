@@ -1,15 +1,8 @@
 {
   "version": "7.3",
-  "sources_total": 9,
-  "sources_ok": 6,
+  "sources_total": 19,
+  "sources_ok": 19,
   "source_stats": [
-    {
-      "url": "https://raw.githubusercontent.com/soroushmirzaei/telegram-configs-collector/main/protocols/vless",
-      "ok": false,
-      "status_code": 404,
-      "bytes": 0,
-      "error": "http_404"
-    },
     {
       "url": "https://raw.githubusercontent.com/mahdibland/ShadowsocksAggregator/master/Eternity.txt",
       "ok": true,
@@ -18,24 +11,10 @@
       "error": ""
     },
     {
-      "url": "https://raw.githubusercontent.com/itsyebekhe/HiN-VPN/main/subscription/normal/mix",
-      "ok": false,
-      "status_code": 404,
-      "bytes": 0,
-      "error": "http_404"
-    },
-    {
-      "url": "https://raw.githubusercontent.com/barry-far/V2ray-Configs/main/All_Configs_Sub.txt",
-      "ok": false,
-      "status_code": 404,
-      "bytes": 0,
-      "error": "http_404"
-    },
-    {
       "url": "https://raw.githubusercontent.com/barry-far/V2ray-Config/refs/heads/main/All_Configs_Sub.txt",
       "ok": true,
       "status_code": 200,
-      "bytes": 780114,
+      "bytes": 780185,
       "error": ""
     },
     {
@@ -65,13 +44,104 @@
       "status_code": 200,
       "bytes": 68174,
       "error": ""
+    },
+    {
+      "url": "https://raw.githubusercontent.com/mohamadfg-dev/telegram-v2ray-configs-collector/refs/heads/main/category/vless.txt",
+      "ok": true,
+      "status_code": 200,
+      "bytes": 68174,
+      "error": ""
+    },
+    {
+      "url": "https://raw.githubusercontent.com/DukeMehdi/FreeList-V2ray-Configs/refs/heads/main/Configs/VLESS-DukeMehdi-Configs.txt",
+      "ok": true,
+      "status_code": 200,
+      "bytes": 18205567,
+      "error": ""
+    },
+    {
+      "url": "https://raw.githubusercontent.com/SoliSpirit/v2ray-configs/refs/heads/main/Protocols/vless.txt",
+      "ok": true,
+      "status_code": 200,
+      "bytes": 678681,
+      "error": ""
+    },
+    {
+      "url": "https://raw.githubusercontent.com/V2RAYCONFIGSPOOL/V2RAY_SUB/refs/heads/main/v2ray_configs_no1.txt",
+      "ok": true,
+      "status_code": 200,
+      "bytes": 6065,
+      "error": ""
+    },
+    {
+      "url": "https://raw.githubusercontent.com/V2RAYCONFIGSPOOL/V2RAY_SUB/refs/heads/main/v2ray_configs_no2.txt",
+      "ok": true,
+      "status_code": 200,
+      "bytes": 6116,
+      "error": ""
+    },
+    {
+      "url": "https://raw.githubusercontent.com/V2RAYCONFIGSPOOL/V2RAY_SUB/refs/heads/main/v2ray_configs_no3.txt",
+      "ok": true,
+      "status_code": 200,
+      "bytes": 6104,
+      "error": ""
+    },
+    {
+      "url": "https://raw.githubusercontent.com/V2RAYCONFIGSPOOL/V2RAY_SUB/refs/heads/main/v2ray_configs_no4.txt",
+      "ok": true,
+      "status_code": 200,
+      "bytes": 8626,
+      "error": ""
+    },
+    {
+      "url": "https://raw.githubusercontent.com/V2RAYCONFIGSPOOL/V2RAY_SUB/refs/heads/main/v2ray_configs_no5.txt",
+      "ok": true,
+      "status_code": 200,
+      "bytes": 7606,
+      "error": ""
+    },
+    {
+      "url": "https://raw.githubusercontent.com/V2RAYCONFIGSPOOL/V2RAY_SUB/refs/heads/main/v2ray_configs_no6.txt",
+      "ok": true,
+      "status_code": 200,
+      "bytes": 5368,
+      "error": ""
+    },
+    {
+      "url": "https://raw.githubusercontent.com/V2RAYCONFIGSPOOL/V2RAY_SUB/refs/heads/main/v2ray_configs_no7.txt",
+      "ok": true,
+      "status_code": 200,
+      "bytes": 6761,
+      "error": ""
+    },
+    {
+      "url": "https://raw.githubusercontent.com/V2RAYCONFIGSPOOL/V2RAY_SUB/refs/heads/main/v2ray_configs_no8.txt",
+      "ok": true,
+      "status_code": 200,
+      "bytes": 7091,
+      "error": ""
+    },
+    {
+      "url": "https://raw.githubusercontent.com/V2RAYCONFIGSPOOL/V2RAY_SUB/refs/heads/main/v2ray_configs_no9.txt",
+      "ok": true,
+      "status_code": 200,
+      "bytes": 6535,
+      "error": ""
+    },
+    {
+      "url": "https://raw.githubusercontent.com/V2RAYCONFIGSPOOL/V2RAY_SUB/refs/heads/main/v2ray_configs_no10.txt",
+      "ok": true,
+      "status_code": 200,
+      "bytes": 5623,
+      "error": ""
     }
   ],
-  "raw_text_size": 1591831,
-  "extracted_links": 5447,
-  "validated_candidates": 205,
-  "deduped_candidates": 70,
-  "final_output": 70,
+  "raw_text_size": 20610232,
+  "extracted_links": 76580,
+  "validated_candidates": 3770,
+  "deduped_candidates": 1225,
+  "final_output": 128,
   "max_output": 128,
   "max_per_host": 2,
   "golden_ports": [
@@ -84,27 +154,27 @@
   "mandatory_net": "tcp",
   "live_test_enabled": false,
   "counters": {
-    "rejected_parse": 11,
-    "rejected_non_reality": 4559,
-    "rejected_non_tcp": 141,
-    "rejected_non_golden_port": 304,
-    "rejected_fp_not_chrome": 154,
-    "rejected_missing_pbk": 0,
-    "rejected_missing_sid": 25,
-    "rejected_missing_sni": 7,
+    "rejected_parse": 103,
+    "rejected_non_reality": 58601,
+    "rejected_non_tcp": 3676,
+    "rejected_non_golden_port": 4407,
+    "rejected_fp_not_chrome": 4378,
+    "rejected_missing_pbk": 3,
+    "rejected_missing_sid": 850,
+    "rejected_missing_sni": 40,
     "rejected_empty_uuid": 0,
-    "rejected_bad_host": 0,
-    "rejected_bad_sni": 0,
-    "rejected_missing_flow": 41,
+    "rejected_bad_host": 2,
+    "rejected_bad_sni": 61,
+    "rejected_missing_flow": 689,
     "rejected_bad_flow": 0,
     "rejected_short_pbk": 0,
     "rejected_short_sid": 0,
-    "validated_ok": 205,
-    "dedupe_collisions": 135,
+    "validated_ok": 3770,
+    "dedupe_collisions": 2545,
     "rejected_host_cap": 0,
-    "selected_final": 70
+    "selected_final": 128
   },
   "output_file": "MOJTABA_CLEAN_LIST.txt",
   "telemetry_file": "surgeon_telemetry.json",
-  "elapsed_sec": 1.778
+  "elapsed_sec": 8.031
 }
