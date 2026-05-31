@@ -927,7 +927,7 @@ def assign_total_scores(candidates: List[Candidate], live_worked: bool, tls_supp
             c.total_score = c.offline_score
 
 
-def final_select(candidates: List[Candidate], tls_supported: bool) -> List[Candidate]:
+def final_select(candidates: List[Candidate], tls_supported: bool, live_worked: bool) -> List[Candidate]:
     def sort_key(c: Candidate):
         tls_rank = 1 if c.tls_ok else 0
         tcp_rank = 1 if c.tcp_ok else 0
@@ -959,6 +959,8 @@ def final_select(candidates: List[Candidate], tls_supported: bool) -> List[Candi
     chosen = []
     per_host = defaultdict(int)
 
+    any_tcp_ok = live_worked and any(x.tcp_ok for x in ordered)
+
     for c in ordered:
         if len(chosen) >= MAX_OUTPUT:
             break
@@ -966,7 +968,7 @@ def final_select(candidates: List[Candidate], tls_supported: bool) -> List[Candi
         if per_host[c.host] >= MAX_PER_HOST:
             continue
 
-        if c.tcp_ok is False and any(x.tcp_ok for x in ordered):
+        if any_tcp_ok and c.tcp_ok is False:
             continue
 
         chosen.append(c)
@@ -1125,17 +1127,20 @@ def main() -> None:
         tel.deduped_candidates = len(deduped)
 
         live_results = run_go_live_probe(deduped, tel)
-        merge_live_probe_scores(deduped, live_results, tel)
+
+        if tel.live_probe_succeeded:
+            merge_live_probe_scores(deduped, live_results, tel)
 
         assign_total_scores(
             deduped,
             live_worked=tel.live_probe_succeeded,
             tls_supported=tel.live_probe_tls_supported,
         )
-
+    
         selected = final_select(
             deduped,
             tls_supported=tel.live_probe_tls_supported,
+            live_worked=tel.live_probe_succeeded,
         )
 
         tel.final_selected = len(selected)
