@@ -1,4 +1,4 @@
-name: Mojtaba Reality Update V7.3
+name: Mojtaba Reality Update V7.4
 
 on:
   workflow_dispatch:
@@ -11,6 +11,8 @@ permissions:
 jobs:
   update:
     runs-on: ubuntu-24.04
+    timeout-minutes: 5
+
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -20,21 +22,46 @@ jobs:
         with:
           python-version: "3.13"
 
-      - name: Install dependencies
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+
+      - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      - name: Build Go prober
+        run: |
+          go version
+          go build -o prober ./prober.go
+          chmod +x ./prober
+          ls -lh ./prober
+
       - name: Run Surgeon
+        env:
+          SURGEON_PROBER_BIN: ./prober
         run: |
           python surgeon.py
 
       - name: Fail if output is empty
         run: |
           if [[ ! -s MOJTABA_CLEAN_LIST.txt ]]; then
-            echo "::error:: MOJTABA_CLEAN_LIST.txt is empty. Surgeon failed to find configs."
-            # اینجا می‌توانیم ببینیم آیا فایل log داریم یا نه
-            cat network_test_log.txt || echo "No network logs found."
+            echo "::error::MOJTABA_CLEAN_LIST.txt is empty. Surgeon failed to produce configs."
+
+            if [[ -f surgeon_telemetry.json ]]; then
+              echo "=== surgeon_telemetry.json ==="
+              cat surgeon_telemetry.json
+            fi
+
+            if [[ -f network_test_log.txt ]]; then
+              echo "=== network_test_log.txt ==="
+              cat network_test_log.txt
+            else
+              echo "No network logs found."
+            fi
+
             exit 1
           fi
 
@@ -49,15 +76,3 @@ jobs:
 
           git add MOJTABA_CLEAN_LIST.txt .last_successful_update
 
-          # telemetry may or may not exist (but in our surgeon it will)
-          if [[ -f surgeon_telemetry.json ]]; then
-            git add surgeon_telemetry.json
-          fi
-
-          if git diff --cached --quiet; then
-            echo "No changes to commit."
-            exit 0
-          fi
-
-          git commit -m "Update reality list (V7.3)"
-          git push
