@@ -1,7 +1,7 @@
 <br>
 
 <div align="center">
-  <img src="https://capsule-render.vercel.app/api?type=rounded&height=160&color=gradient&text=Mojtaba%20Reality%20Surgeon%20V7.4&fontAlign=50&fontAlignY=50&fontSize=40" />
+  <img src="https://capsule-render.vercel.app/api?type=rounded&height=160&color=gradient&text=Mojtaba%20Reality%20Surgeon%20V7.5&fontAlign=50&fontAlignY=50&fontSize=40" />
   
   <p><b>پایپ‌لاین خودکار جراحی، پالایش و انتخاب هوشمند کانفیگ‌های Reality برای اپراتورهای ایران</b></p>
 </div>
@@ -12,7 +12,7 @@
 [![Update](https://img.shields.io/badge/Update-Every%203%20Hours-blue?style=for-the-badge)]()
 [![Python](https://img.shields.io/badge/Python-3.13-aff?style=for-the-badge&logo=python)]()
 [![Go](https://img.shields.io/badge/Go-1.22-00ADD8?style=for-the-badge&logo=go)]()
-[![Telemetry](https://img.shields.io/badge/Telemetry-V7.4--Enabled-orange?style=for-the-badge)]()
+[![Telemetry](https://img.shields.io/badge/Telemetry-V7.5--Enabled-orange?style=for-the-badge)]()
 
 </div>
 
@@ -41,7 +41,8 @@ https://raw.githubusercontent.com/Mojtaba1423/My-Clean-Configs/main/MOJTABA_CLEA
 این پروژه یک سیستم خودکار برای جمع‌آوری، تمیزکاری و انتخاب کانفیگ‌های **Reality** است.  
 هدف اصلی آن این است که از بین تعداد زیادی کانفیگ خام، گزینه‌هایی انتخاب شوند که شانس بیشتری برای کار کردن، پایداری بهتر و سازگاری مناسب‌تر روی اینترنت **مخابرات، همراه اول و ایرانسل** داشته باشند.
 
-در نسخه **V7.4** روند انتخاب و پالایش بهتر شده و تست زنده‌ی سریع‌تری هم به سیستم اضافه شده تا خروجی نهایی usable‌تر و تمیزتر باشد.
+در نسخه **V7.5** روند پالایش یک مرحله مهم‌تر و دقیق‌تر شده است.  
+برخلاف نسخه قبل که بیشتر روی بررسی سریع در دسترس بودن اولیه تمرکز داشت، در این نسخه علاوه بر تست TCP، **TLS Handshake** هم در فرآیند ارزیابی زنده وارد شده تا نودهایی که فقط «ظاهراً سالم» هستند ولی در سرویس‌های حساس به TLS عملکرد ضعیفی دارند، بهتر شناسایی شوند.
 
 این لیست هر **۳ ساعت** یک‌بار به‌روزرسانی می‌شود.
 
@@ -50,7 +51,7 @@ https://raw.githubusercontent.com/Mojtaba1423/My-Clean-Configs/main/MOJTABA_CLEA
 <br>
 
 <div align="center">
-  <h3 style="color: #00D2FF;">🚀 قابلیت‌های کلیدی (Key Features - V7.4)</h3>
+  <h3 style="color: #00D2FF;">🚀 قابلیت‌های کلیدی (Key Features - V7.5)</h3>
   <table dir="rtl" style="margin-left: auto; margin-right: auto; border-radius: 10px; overflow: hidden;">
 <thead>
 <tr style="background-color: #21262d;">
@@ -76,9 +77,14 @@ https://raw.githubusercontent.com/Mojtaba1423/My-Clean-Configs/main/MOJTABA_CLEA
 <td align="center">شانس بالاتر برای اتصال موفق</td>
 </tr>
 <tr>
-<td align="center"><b>تست زنده سریع</b></td>
-<td align="center">بررسی سریع‌تر در دسترس بودن اولیه بعضی نودها</td>
-<td align="center">انتخاب بهتر بین گزینه‌های موجود</td>
+<td align="center"><b>تست زنده TCP + TLS</b></td>
+<td align="center">بررسی هم‌زمان اتصال TCP و موفقیت TLS Handshake با SNI مناسب</td>
+<td align="center">تشخیص بهتر نودهای واقعاً قابل‌استفاده برای سرویس‌های حساس</td>
+</tr>
+<tr>
+<td align="center"><b>کاهش Fake-Good</b></td>
+<td align="center">حذف بهتر نودهایی که در ظاهر سالم‌اند ولی در لایه TLS ضعیف عمل می‌کنند</td>
+<td align="center">خروجی usable‌تر برای اینستاگرام، یوتیوب و سرویس‌های مشابه</td>
 </tr>
 <tr>
 <td align="center"><b>خروجی پایدارتر</b></td>
@@ -89,6 +95,11 @@ https://raw.githubusercontent.com/Mojtaba1423/My-Clean-Configs/main/MOJTABA_CLEA
 <td align="center"><b>تنوع بیشتر</b></td>
 <td align="center">جلوگیری از غلبه بیش از حد یک میزبان یا یک نوع نود در خروجی</td>
 <td align="center">لیست متنوع‌تر و متعادل‌تر</td>
+</tr>
+<tr>
+<td align="center"><b>نام‌گذاری رتبه‌ای جدید</b></td>
+<td align="center">اعمال نام‌های متفاوت بر اساس رتبه نهایی نودها</td>
+<td align="center">تشخیص سریع‌تر کیفیت نسبی کانفیگ‌ها در خروجی</td>
 </tr>
 </tbody>
   </table>
@@ -101,7 +112,21 @@ https://raw.githubusercontent.com/Mojtaba1423/My-Clean-Configs/main/MOJTABA_CLEA
 ## 📜 تاریخچه تغییرات
 
 <details open>
-<summary><b><font color="#00D2FF">نسخه V7.4 - بهبود انتخاب و تست سریع‌تر</font></b></summary>
+<summary><b><font color="#00D2FF">نسخه V7.5 - ارتقای ارزیابی زنده با TCP + TLS</font></b></summary>
+<br>
+<ul>
+  <li>ارتقای سیستم تست زنده از حالت <code>TCP-only</code> به <code>TCP + TLS Handshake</code>.</li>
+  <li>افزوده شدن پشتیبانی از <code>SNI</code> برای ارزیابی دقیق‌تر نودها در لایه TLS.</li>
+  <li>بهبود امتیازدهی برای تشخیص بهتر نودهای مناسب سرویس‌های استریم و سرویس‌های حساس به TLS.</li>
+  <li>کاهش احتمال باقی ماندن نودهای <b>Fake-Good</b> در خروجی نهایی.</li>
+  <li>بهینه‌سازی هماهنگی بین <code>surgeon.py</code> و <code>prober.go</code> در فرآیند ارزیابی زنده.</li>
+  <li>پیاده‌سازی سیستم نام‌گذاری رتبه‌ای سه‌مرحله‌ای بر اساس امتیاز نهایی.</li>
+  <li>افزایش پایداری workflow و آماده‌سازی بهتر برای نسخه‌های بعدی.</li>
+</ul>
+</details>
+
+<details>
+<summary><b><font color="#999">نسخه V7.4 - بهبود انتخاب و تست سریع‌تر</font></b></summary>
 <br>
 <ul>
   <li>افزوده شدن تست زنده‌ی سریع‌تر برای بررسی بهتر نودها.</li>
@@ -176,6 +201,8 @@ https://raw.githubusercontent.com/Mojtaba1423/My-Clean-Configs/main/MOJTABA_CLEA
 ## ❤️ جمع‌بندی
 
 این پروژه تلاش می‌کند در هر بروزرسانی، از بین انبوهی از کانفیگ‌های خام، یک لیست **تمیزتر، پایدارتر و قابل‌استفاده‌تر** ارائه دهد تا کاربر بدون درگیر شدن با گزینه‌های تکراری و کم‌ارزش، مستقیم به خروجی بهتر برسد.
+
+در **V7.5** تمرکز اصلی روی این بوده که خروجی فقط «در ظاهر سالم» نباشد، بلکه برای سناریوهای واقعی‌تر و سرویس‌هایی که به کیفیت TLS حساس هستند هم انتخاب دقیق‌تری انجام شود.
 
 </div>
 
