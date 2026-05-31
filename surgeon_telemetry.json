@@ -1,10 +1,11 @@
 {
-  "version": "7.4",
-  "started_at": 1780241733.534826,
-  "finished_at": 1780241746.769021,
-  "duration_sec": 13.234,
-  "started_at_human": "2026-05-31 15:35:33",
-  "finished_at_human": "2026-05-31 15:35:46",
+  "version": "7.5",
+  "started_at": 1780245632.7172916,
+  "finished_at": 1780245646.9955049,
+  "duration_sec": 14.278,
+  "started_at_human": "2026-05-31 16:40:32",
+  "finished_at_human": "2026-05-31 16:40:46",
+  "source_count": 18,
   "source_stats": {
     "https://raw.githubusercontent.com/mahdibland/ShadowsocksAggregator/master/Eternity.txt": {
       "url": "https://raw.githubusercontent.com/mahdibland/ShadowsocksAggregator/master/Eternity.txt",
@@ -19,16 +20,16 @@
       "ok": true,
       "status_code": 200,
       "error": "",
-      "bytes": 798333,
-      "extracted_links": 2537
+      "bytes": 799750,
+      "extracted_links": 2538
     },
     "https://raw.githubusercontent.com/SoliSpirit/v2ray-configs/refs/heads/main/Protocols/vless.txt": {
       "url": "https://raw.githubusercontent.com/SoliSpirit/v2ray-configs/refs/heads/main/Protocols/vless.txt",
       "ok": true,
       "status_code": 200,
       "error": "",
-      "bytes": 686941,
-      "extracted_links": 2782
+      "bytes": 748951,
+      "extracted_links": 3040
     },
     "https://raw.githubusercontent.com/mrvcoder/V2rayCollector/refs/heads/main/vless_iran.txt": {
       "url": "https://raw.githubusercontent.com/mrvcoder/V2rayCollector/refs/heads/main/vless_iran.txt",
@@ -51,16 +52,16 @@
       "ok": true,
       "status_code": 200,
       "error": "",
-      "bytes": 68513,
-      "extracted_links": 300
+      "bytes": 69136,
+      "extracted_links": 303
     },
     "https://raw.githubusercontent.com/mohamadfg-dev/telegram-v2ray-configs-collector/refs/heads/main/category/vless.txt": {
       "url": "https://raw.githubusercontent.com/mohamadfg-dev/telegram-v2ray-configs-collector/refs/heads/main/category/vless.txt",
       "ok": true,
       "status_code": 200,
       "error": "",
-      "bytes": 68513,
-      "extracted_links": 300
+      "bytes": 69136,
+      "extracted_links": 303
     },
     "https://raw.githubusercontent.com/DukeMehdi/FreeList-V2ray-Configs/refs/heads/main/Configs/VLESS-DukeMehdi-Configs.txt": {
       "url": "https://raw.githubusercontent.com/DukeMehdi/FreeList-V2ray-Configs/refs/heads/main/Configs/VLESS-DukeMehdi-Configs.txt",
@@ -75,31 +76,31 @@
       "ok": true,
       "status_code": 200,
       "error": "",
-      "bytes": 6102,
-      "extracted_links": 18
+      "bytes": 5364,
+      "extracted_links": 17
     },
     "https://raw.githubusercontent.com/V2RAYCONFIGSPOOL/V2RAY_SUB/refs/heads/main/v2ray_configs_no2.txt": {
       "url": "https://raw.githubusercontent.com/V2RAYCONFIGSPOOL/V2RAY_SUB/refs/heads/main/v2ray_configs_no2.txt",
       "ok": true,
       "status_code": 200,
       "error": "",
-      "bytes": 5940,
-      "extracted_links": 19
+      "bytes": 5579,
+      "extracted_links": 14
     },
     "https://raw.githubusercontent.com/V2RAYCONFIGSPOOL/V2RAY_SUB/refs/heads/main/v2ray_configs_no3.txt": {
       "url": "https://raw.githubusercontent.com/V2RAYCONFIGSPOOL/V2RAY_SUB/refs/heads/main/v2ray_configs_no3.txt",
       "ok": true,
       "status_code": 200,
       "error": "",
-      "bytes": 5625,
-      "extracted_links": 20
+      "bytes": 5930,
+      "extracted_links": 14
     },
     "https://raw.githubusercontent.com/V2RAYCONFIGSPOOL/V2RAY_SUB/refs/heads/main/v2ray_configs_no4.txt": {
       "url": "https://raw.githubusercontent.com/V2RAYCONFIGSPOOL/V2RAY_SUB/refs/heads/main/v2ray_configs_no4.txt",
       "ok": true,
       "status_code": 200,
       "error": "",
-      "bytes": 6483,
+      "bytes": 6384,
       "extracted_links": 15
     },
     "https://raw.githubusercontent.com/V2RAYCONFIGSPOOL/V2RAY_SUB/refs/heads/main/v2ray_configs_no5.txt": {
@@ -107,63 +108,64 @@
       "ok": true,
       "status_code": 200,
       "error": "",
-      "bytes": 6501,
-      "extracted_links": 14
+      "bytes": 6541,
+      "extracted_links": 16
     },
     "https://raw.githubusercontent.com/V2RAYCONFIGSPOOL/V2RAY_SUB/refs/heads/main/v2ray_configs_no6.txt": {
       "url": "https://raw.githubusercontent.com/V2RAYCONFIGSPOOL/V2RAY_SUB/refs/heads/main/v2ray_configs_no6.txt",
       "ok": true,
       "status_code": 200,
       "error": "",
-      "bytes": 5342,
-      "extracted_links": 20
+      "bytes": 6028,
+      "extracted_links": 11
     },
     "https://raw.githubusercontent.com/V2RAYCONFIGSPOOL/V2RAY_SUB/refs/heads/main/v2ray_configs_no7.txt": {
       "url": "https://raw.githubusercontent.com/V2RAYCONFIGSPOOL/V2RAY_SUB/refs/heads/main/v2ray_configs_no7.txt",
       "ok": true,
       "status_code": 200,
       "error": "",
-      "bytes": 5589,
-      "extracted_links": 20
+      "bytes": 5815,
+      "extracted_links": 12
     },
     "https://raw.githubusercontent.com/V2RAYCONFIGSPOOL/V2RAY_SUB/refs/heads/main/v2ray_configs_no8.txt": {
       "url": "https://raw.githubusercontent.com/V2RAYCONFIGSPOOL/V2RAY_SUB/refs/heads/main/v2ray_configs_no8.txt",
       "ok": true,
       "status_code": 200,
       "error": "",
-      "bytes": 5485,
-      "extracted_links": 20
+      "bytes": 5336,
+      "extracted_links": 12
     },
     "https://raw.githubusercontent.com/V2RAYCONFIGSPOOL/V2RAY_SUB/refs/heads/main/v2ray_configs_no9.txt": {
       "url": "https://raw.githubusercontent.com/V2RAYCONFIGSPOOL/V2RAY_SUB/refs/heads/main/v2ray_configs_no9.txt",
       "ok": true,
       "status_code": 200,
       "error": "",
-      "bytes": 5335,
-      "extracted_links": 19
+      "bytes": 6159,
+      "extracted_links": 16
     },
     "https://raw.githubusercontent.com/V2RAYCONFIGSPOOL/V2RAY_SUB/refs/heads/main/v2ray_configs_no10.txt": {
       "url": "https://raw.githubusercontent.com/V2RAYCONFIGSPOOL/V2RAY_SUB/refs/heads/main/v2ray_configs_no10.txt",
       "ok": true,
       "status_code": 200,
       "error": "",
-      "bytes": 5489,
-      "extracted_links": 20
+      "bytes": 5720,
+      "extracted_links": 15
     }
   },
-  "total_extracted_links": 82544,
-  "total_parsed_links": 82544,
+  "total_extracted_links": 79984,
+  "total_parsed_links": 79984,
   "rejects": {
-    "port_not_allowed": 38868,
-    "security_not_reality": 28324,
-    "fp_not_chrome": 4749,
-    "type_not_tcp": 1979,
-    "missing_sni": 49,
-    "bad_uuid": 2609,
-    "private_or_bogon_host_ip": 8,
-    "bad_urlsplit": 155,
-    "missing_at": 91,
+    "security_not_reality": 27149,
+    "port_not_allowed": 37829,
+    "fp_not_chrome": 4713,
+    "type_not_tcp": 1938,
+    "missing_sni": 47,
+    "bad_uuid": 2446,
+    "private_or_bogon_host_ip": 7,
+    "bad_urlsplit": 153,
+    "missing_at": 85,
     "bad_hostname": 5,
+    "sid_not_hex": 5,
     "bad_sni": 6,
     "missing_or_short_pbk": 3,
     "bad_encryption": 9,
@@ -171,24 +173,45 @@
     "missing_port": 4,
     "bad_port": 1
   },
-  "valid_candidates_before_dedupe": 5675,
-  "deduped_candidates": 4181,
+  "valid_candidates_before_dedupe": 5575,
+  "deduped_candidates": 4183,
   "live_probe": {
     "enabled": true,
     "binary_exists": true,
     "invoked": true,
     "succeeded": true,
     "failed_reason": "",
-    "total_tested": 4181,
-    "success": 2885,
-    "fail": 1296,
-    "latency": {
-      "min_ms": 2.63,
-      "avg_ms": 167.16,
-      "p50_ms": 143.93,
-      "p90_ms": 208.0,
-      "max_ms": 2269.47
+    "tls_supported": true,
+    "total_tested": 4183,
+    "tcp": {
+      "success": 2860,
+      "fail": 1323,
+      "latency": {
+        "min_ms": 1.77,
+        "avg_ms": 207.49,
+        "p50_ms": 188.98,
+        "p90_ms": 234.87,
+        "max_ms": 1250.19
+      }
+    },
+    "tls": {
+      "success": 2476,
+      "fail": 1707,
+      "latency": {
+        "min_ms": 4.12,
+        "avg_ms": 259.56,
+        "p50_ms": 205.91,
+        "p90_ms": 370.49,
+        "max_ms": 1249.58
+      }
     }
+  },
+  "naming": {
+    "top_1_to": 5,
+    "middle_6_to": 32,
+    "top_name": "🕯️🖤 Mojtaba1423",
+    "middle_name": "🌙⚫ @mojtaba_1423",
+    "rest_name": "🦂🌑 M_1423"
   },
   "final_selected": 128
 }
