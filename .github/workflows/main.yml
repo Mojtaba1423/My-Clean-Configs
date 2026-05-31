@@ -1,4 +1,4 @@
-name: Mojtaba Reality Update V7.4
+name: Mojtaba Reality Update V7.5
 
 on:
   workflow_dispatch:
@@ -11,7 +11,7 @@ permissions:
 jobs:
   update:
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
+    timeout-minutes: 10
 
     steps:
       - name: Checkout
@@ -42,7 +42,12 @@ jobs:
 
       - name: Run Surgeon
         env:
-          SURGEON_PROBER_BIN: ./prober
+          LIVE_TEST_BINARY: ./prober
+          LIVE_TEST_CONCURRENCY: "400"
+          LIVE_TEST_TIMEOUT_MS: "2500"
+          LIVE_TEST_PROCESS_TIMEOUT_SEC: "180"
+          MAX_OUTPUT: "128"
+          MAX_PER_HOST: "2"
         run: |
           python surgeon.py
 
@@ -80,6 +85,6 @@ jobs:
           if git diff --cached --quiet; then
             echo "No changes to commit."
           else
-            git commit -m "Update clean configs"
+            git commit -m "Update clean configs V7.5"
             git push
           fi
