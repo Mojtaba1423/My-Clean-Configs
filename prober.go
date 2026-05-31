@@ -1,12 +1,13 @@
-// prober.go
 package main
 
 import (
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"net"
 	"os"
 	"runtime"
+	"strings"
 	"sync"
 	"time"
 )
@@ -21,6 +22,7 @@ type ProbeTarget struct {
 	ID   string `json:"id"`
 	Host string `json:"host"`
 	Port int    `json:"port"`
+	SNI  string `json:"sni,omitempty"`
 }
 
 type ProbeResponse struct {
@@ -28,12 +30,15 @@ type ProbeResponse struct {
 }
 
 type ProbeResult struct {
-	ID        string  `json:"id"`
-	Host      string  `json:"host"`
-	Port      int     `json:"port"`
-	TCPOK     bool    `json:"tcp_ok"`
-	LatencyMS float64 `json:"latency_ms,omitempty"`
-	Error     string  `json:"error,omitempty"`
+	ID           string  `json:"id"`
+	Host         string  `json:"host"`
+	Port         int     `json:"port"`
+	TCPOK        bool    `json:"tcp_ok"`
+	TCPLatencyMS float64 `json:"tcp_latency_ms,omitempty"`
+	TLSOK        bool    `json:"tls_ok"`
+	TLSLatencyMS float64 `json:"tls_latency_ms,omitempty"`
+	Error        string  `json:"error,omitempty"`
+	TLSError     string  `json:"tls_error,omitempty"`
 }
 
 func clampConcurrency(n int, total int) int {
@@ -65,7 +70,27 @@ func clampTimeoutMS(n int) int {
 	return n
 }
 
-func probeTCP(target ProbeTarget, timeout time.Duration) ProbeResult {
+func splitTimeouts(total time.Duration) (time.Duration, time.Duration) {
+	if total <= 0 {
+		total = 2500 * time.Millisecond
+	}
+
+	tcpTimeout := total / 2
+	tlsTimeout := total - tcpTimeout
+
+	minPart := 250 * time.Millisecond
+
+	if tcpTimeout < minPart {
+		tcpTimeout = minPart
+	}
+	if tlsTimeout < minPart {
+		tlsTimeout = minPart
+	}
+
+	return tcpTimeout, tlsTimeout
+}
+
+func probeTarget(target ProbeTarget, totalTimeout time.Duration) ProbeResult {
 	result := ProbeResult{
 		ID:   target.ID,
 		Host: target.Host,
@@ -74,34 +99,68 @@ func probeTCP(target ProbeTarget, timeout time.Duration) ProbeResult {
 
 	if target.Host == "" {
 		result.TCPOK = false
+		result.TLSOK = false
 		result.Error = "empty_host"
 		return result
 	}
 
 	if target.Port <= 0 || target.Port > 65535 {
 		result.TCPOK = false
+		result.TLSOK = false
 		result.Error = "bad_port"
 		return result
 	}
 
+	sni := strings.TrimSpace(target.SNI)
+	if sni == "" {
+		result.TCPOK = false
+		result.TLSOK = false
+		result.Error = "empty_sni"
+		return result
+	}
+
 	address := net.JoinHostPort(target.Host, fmt.Sprintf("%d", target.Port))
+	tcpTimeout, tlsTimeout := splitTimeouts(totalTimeout)
 
-	start := time.Now()
-
-	conn, err := net.DialTimeout("tcp", address, timeout)
-	elapsed := time.Since(start)
+	tcpStart := time.Now()
+	rawConn, err := net.DialTimeout("tcp", address, tcpTimeout)
+	tcpElapsed := time.Since(tcpStart)
 
 	if err != nil {
 		result.TCPOK = false
+		result.TLSOK = false
 		result.Error = normalizeNetError(err)
 		return result
 	}
 
-	_ = conn.Close()
-
 	result.TCPOK = true
-	result.LatencyMS = float64(elapsed.Microseconds()) / 1000.0
+	result.TCPLatencyMS = float64(tcpElapsed.Microseconds()) / 1000.0
 
+	_ = rawConn.SetDeadline(time.Now().Add(tlsTimeout))
+
+	tlsConfig := &tls.Config{
+		ServerName:         sni,
+		InsecureSkipVerify: true,
+		MinVersion:         tls.VersionTLS12,
+	}
+
+	tlsConn := tls.Client(rawConn, tlsConfig)
+
+	tlsStart := time.Now()
+	err = tlsConn.Handshake()
+	tlsElapsed := time.Since(tlsStart)
+
+	if err != nil {
+		result.TLSOK = false
+		result.TLSError = normalizeTLSError(err)
+		_ = tlsConn.Close()
+		return result
+	}
+
+	result.TLSOK = true
+	result.TLSLatencyMS = float64(tlsElapsed.Microseconds()) / 1000.0
+
+	_ = tlsConn.Close()
 	return result
 }
 
@@ -116,20 +175,20 @@ func normalizeNetError(err error) string {
 		}
 	}
 
-	msg := err.Error()
+	msg := strings.ToLower(err.Error())
 
 	switch {
-	case contains(msg, "connection refused"):
+	case strings.Contains(msg, "connection refused"):
 		return "connection_refused"
-	case contains(msg, "no such host"):
+	case strings.Contains(msg, "no such host"):
 		return "no_such_host"
-	case contains(msg, "network is unreachable"):
+	case strings.Contains(msg, "network is unreachable"):
 		return "network_unreachable"
-	case contains(msg, "host is down"):
+	case strings.Contains(msg, "host is down"):
 		return "host_down"
-	case contains(msg, "i/o timeout"):
+	case strings.Contains(msg, "i/o timeout"):
 		return "timeout"
-	case contains(msg, "operation timed out"):
+	case strings.Contains(msg, "operation timed out"):
 		return "timeout"
 	default:
 		if len(msg) > 160 {
@@ -139,21 +198,42 @@ func normalizeNetError(err error) string {
 	}
 }
 
-func contains(s, sub string) bool {
-	return len(sub) == 0 || indexOf(s, sub) >= 0
-}
+func normalizeTLSError(err error) string {
+	if err == nil {
+		return ""
+	}
 
-func indexOf(s, sub string) int {
-	return len([]rune(s[:])) - len([]rune(s[:])) + stringIndex(s, sub)
-}
-
-func stringIndex(s, sub string) int {
-	for i := 0; i+len(sub) <= len(s); i++ {
-		if s[i:i+len(sub)] == sub {
-			return i
+	if netErr, ok := err.(net.Error); ok {
+		if netErr.Timeout() {
+			return "tls_timeout"
 		}
 	}
-	return -1
+
+	msg := strings.ToLower(err.Error())
+
+	switch {
+	case strings.Contains(msg, "handshake failure"):
+		return "tls_handshake_failure"
+	case strings.Contains(msg, "first record does not look like a tls handshake"):
+		return "not_tls"
+	case strings.Contains(msg, "protocol version not supported"):
+		return "tls_version_unsupported"
+	case strings.Contains(msg, "remote error: tls: internal error"):
+		return "tls_internal_error"
+	case strings.Contains(msg, "remote error: tls: unrecognized name"):
+		return "tls_unrecognized_name"
+	case strings.Contains(msg, "unexpected eof"):
+		return "tls_unexpected_eof"
+	case strings.Contains(msg, "eof"):
+		return "tls_eof"
+	case strings.Contains(msg, "i/o timeout"):
+		return "tls_timeout"
+	default:
+		if len(msg) > 160 {
+			return msg[:160]
+		}
+		return msg
+	}
 }
 
 func readRequest() (ProbeRequest, error) {
@@ -185,7 +265,7 @@ func runProbes(req ProbeRequest) ProbeResponse {
 		go func() {
 			defer wg.Done()
 			for target := range jobs {
-				results <- probeTCP(target, timeout)
+				results <- probeTarget(target, timeout)
 			}
 		}()
 	}
