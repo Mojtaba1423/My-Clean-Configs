@@ -13,6 +13,8 @@ import (
 )
 
 type ProbeRequest struct {
+	Version     string        `json:"version,omitempty"`
+	Mode        string        `json:"mode,omitempty"`
 	Concurrency int           `json:"concurrency"`
 	TimeoutMS   int           `json:"timeout_ms"`
 	Targets     []ProbeTarget `json:"targets"`
@@ -169,10 +171,8 @@ func normalizeNetError(err error) string {
 		return ""
 	}
 
-	if netErr, ok := err.(net.Error); ok {
-		if netErr.Timeout() {
-			return "timeout"
-		}
+	if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
+		return "timeout"
 	}
 
 	msg := strings.ToLower(err.Error())
@@ -203,10 +203,8 @@ func normalizeTLSError(err error) string {
 		return ""
 	}
 
-	if netErr, ok := err.(net.Error); ok {
-		if netErr.Timeout() {
-			return "tls_timeout"
-		}
+	if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
+		return "tls_timeout"
 	}
 
 	msg := strings.ToLower(err.Error())
@@ -302,7 +300,6 @@ func writeFatal(err error) {
 		Results: []ProbeResult{},
 	}
 	_ = writeResponse(resp)
-
 	fmt.Fprintf(os.Stderr, "prober_error: %v\n", err)
 }
 
