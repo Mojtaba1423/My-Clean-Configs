@@ -358,11 +358,12 @@ func readRequest() (ProbeRequest, error) {
 
 	req.Concurrency = clampConcurrency(req.Concurrency, len(req.Targets))
 	req.TimeoutMS = clampTimeoutMS(req.TimeoutMS)
-
-	req.Attempts = clampAttempts(req.Attempts)
-	req.TCPAttempts = clampAttempts(req.TCPAttempts)
-	req.TLSAttempts = clampAttempts(req.TLSAttempts)
 	req.AttemptPauseMS = clampPauseMS(req.AttemptPauseMS)
+
+	if req.Attempts <= 0 {
+		req.Attempts = 1
+	}
+	req.Attempts = clampAttempts(req.Attempts)
 
 	if req.TCPAttempts <= 0 {
 		req.TCPAttempts = req.Attempts
@@ -370,18 +371,13 @@ func readRequest() (ProbeRequest, error) {
 	if req.TLSAttempts <= 0 {
 		req.TLSAttempts = req.Attempts
 	}
-	if req.Attempts <= 0 {
-		req.Attempts = 1
-	}
-	if req.TCPAttempts <= 0 {
-		req.TCPAttempts = 1
-	}
-	if req.TLSAttempts <= 0 {
-		req.TLSAttempts = 1
-	}
+
+	req.TCPAttempts = clampAttempts(req.TCPAttempts)
+	req.TLSAttempts = clampAttempts(req.TLSAttempts)
 
 	return req, nil
 }
+
 
 func runProbes(req ProbeRequest) ProbeResponse {
 	timeout := time.Duration(req.TimeoutMS) * time.Millisecond
