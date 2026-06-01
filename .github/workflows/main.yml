@@ -31,7 +31,10 @@ jobs:
       - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          python -m pip install -r requirements.txt
+
+      - name: Syntax check surgeon.py
+        run: python -m py_compile surgeon.py
 
       - name: Build Go prober
         run: |
@@ -52,8 +55,7 @@ jobs:
           LIVE_TEST_ATTEMPT_PAUSE_MS: "150"
           MAX_OUTPUT: "128"
           MAX_PER_HOST: "2"
-        run: |
-          python surgeon.py
+        run: python surgeon.py
 
       - name: Show telemetry
         if: always()
@@ -68,24 +70,27 @@ jobs:
       - name: Fail if output is empty
         run: |
           if [[ ! -s MOJTABA_CLEAN_LIST.txt ]]; then
-            echo "::error::MOJTABA_CLEAN_LIST.txt is empty. Surgeon failed to produce configs."
+            echo "::error::MOJTABA_CLEAN_LIST.txt is empty. Surgeon failed to produce output."
             exit 1
           fi
 
       - name: Update Timestamp
-        run: |
-          date +%s > .last_successful_update
+        run: date +%s > .last_successful_update
 
       - name: Commit & Push
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          git add MOJTABA_CLEAN_LIST.txt .last_successful_update surgeon_telemetry.json
+          git add MOJTABA_CLEAN_LIST.txt .last_successful_update
+
+          if [[ -f surgeon_telemetry.json ]]; then
+            git add surgeon_telemetry.json
+          fi
 
           if git diff --cached --quiet; then
             echo "No changes to commit."
           else
-            git commit -m "Update clean configs V7.6"
+            git commit -m "Update generated files"
             git push
           fi
