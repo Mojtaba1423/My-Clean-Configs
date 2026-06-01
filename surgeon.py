@@ -25,7 +25,7 @@ import sys
 import time
 from dataclasses import dataclass, field
 from typing import Dict, Iterable, List, Optional, Set, Tuple
-from urllib.parse import parse_qs, unquote, urlsplit
+from urllib.parse import parse_qs, quote, unquote, urlsplit
 
 import requests
 
@@ -74,6 +74,13 @@ LIVE_TEST_ATTEMPTS = int(os.getenv("LIVE_TEST_ATTEMPTS", "2"))
 LIVE_TEST_TCP_ATTEMPTS = int(os.getenv("LIVE_TEST_TCP_ATTEMPTS", "2"))
 LIVE_TEST_TLS_ATTEMPTS = int(os.getenv("LIVE_TEST_TLS_ATTEMPTS", "2"))
 LIVE_TEST_ATTEMPT_PAUSE_MS = int(os.getenv("LIVE_TEST_ATTEMPT_PAUSE_MS", "150"))
+
+TOP_NAME_COUNT = int(os.environ.get("TOP_NAME_COUNT", "5"))
+MIDDLE_NAME_UNTIL = int(os.environ.get("MIDDLE_NAME_UNTIL", "32"))
+
+NAME_TOP = "🕯️🖤 Mojtaba1423"
+NAME_MIDDLE = "🌙⚫ @mojtaba_1423"
+NAME_REST = "🦂🌑 M_1423"
 
 
 @dataclass
@@ -146,7 +153,8 @@ class Candidate:
                 continue
             parts.append(f"{k}={v}")
         query = "&".join(parts)
-        fragment = self.remark or "MOJTABA"
+
+        fragment = quote(self.remark or "MOJTABA", safe="")
         return f"vless://{self.uuid}@{self.host}:{self.port}?{query}#{fragment}"
 
 
@@ -478,6 +486,19 @@ def finalize_scores(cands: List[Candidate]) -> None:
             c.total_score = c.offline_score
 
 
+def output_name_for_index(idx: int) -> str:
+    if idx < TOP_NAME_COUNT:
+        return NAME_TOP
+    if idx < MIDDLE_NAME_UNTIL:
+        return NAME_MIDDLE
+    return NAME_REST
+
+
+def apply_output_names(cands: List[Candidate]) -> None:
+    for idx, c in enumerate(cands):
+        c.remark = output_name_for_index(idx)
+
+
 def select_best(cands: List[Candidate], max_output: int, max_per_host: int) -> List[Candidate]:
     ordered = sorted(
         cands,
@@ -582,6 +603,7 @@ def main() -> int:
     telemetry["selected"] = len(selected)
     log(f"[select] selected={len(selected)}")
 
+    apply_output_names(selected)
     write_output(selected, OUTPUT_FILE)
 
     telemetry["duration_sec"] = round(time.time() - started, 3)
