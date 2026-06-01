@@ -61,8 +61,13 @@ LIVE_TEST_CONCURRENCY = int(os.environ.get("LIVE_TEST_CONCURRENCY", "400"))
 LIVE_TEST_TIMEOUT_MS = int(os.environ.get("LIVE_TEST_TIMEOUT_MS", "2500"))
 LIVE_TEST_PROCESS_TIMEOUT_SEC = int(os.environ.get("LIVE_TEST_PROCESS_TIMEOUT_SEC", "180"))
 
-FETCH_CONNECT_TIMEOUT = int(os.environ.get("FETCH_CONNECT_TIMEOUT", "12"))
-FETCH_READ_TIMEOUT = int(os.environ.get("FETCH_READ_TIMEOUT", "20"))
+LIVE_TEST_ATTEMPTS = int(os.environ.get("LIVE_TEST_ATTEMPTS", "1"))
+LIVE_TEST_TCP_ATTEMPTS = int(os.environ.get("LIVE_TEST_TCP_ATTEMPTS", "0"))
+LIVE_TEST_TLS_ATTEMPTS = int(os.environ.get("LIVE_TEST_TLS_ATTEMPTS", "0"))
+LIVE_TEST_ATTEMPT_PAUSE_MS = int(os.environ.get("LIVE_TEST_ATTEMPT_PAUSE_MS", "0"))
+
+FETCH_CONNECT_TIMEOUT os.environ.get("FETCH_CONNECT_TIMEOUT", "12"))
+FETCH_READ_TIMEOUT os.environ.get("FETCH_READ_TIMEOUT", "20"))
 
 USER_AGENT = f"Mozilla/5.0 (MOJTABA-Surgeon/{VERSION})"
 
@@ -718,6 +723,10 @@ def run_go_live_probe(candidates: List[Candidate], tel: Telemetry) -> Dict[str, 
         "mode": "tcp_tls",
         "concurrency": LIVE_TEST_CONCURRENCY,
         "timeout_ms": LIVE_TEST_TIMEOUT_MS,
+        "attempts": LIVE_TEST_ATTEMPTS,
+        "tcp_attempts": LIVE_TEST_TCP_ATTEMPTS,
+        "tls_attempts": LIVE_TEST_TLS_ATTEMPTS,
+        "attempt_pause_ms": LIVE_TEST_ATTEMPT_PAUSE_MS,
         "targets": [
             {
                 "id": c.dedupe_key,
@@ -728,6 +737,7 @@ def run_go_live_probe(candidates: List[Candidate], tel: Telemetry) -> Dict[str, 
             for c in candidates
         ],
     }
+
 
     try:
         tel.live_probe_invoked = True
