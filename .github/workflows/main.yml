@@ -1,9 +1,13 @@
-name: Mojtaba Reality Update V7.6
+name: Mojtaba Reality Update V7.7
 
 on:
   workflow_dispatch:
   schedule:
     - cron: "0 */3 * * *"
+
+concurrency:
+  group: mojtaba-reality-update-v7-7
+  cancel-in-progress: true
 
 permissions:
   contents: write
@@ -46,9 +50,9 @@ jobs:
       - name: Run Surgeon
         env:
           LIVE_TEST_BINARY: ./prober
-          LIVE_TEST_CONCURRENCY: "400"
-          LIVE_TEST_TIMEOUT_MS: "2500"
-          LIVE_TEST_PROCESS_TIMEOUT_SEC: "180"
+          LIVE_TEST_CONCURRENCY: "250"
+          LIVE_TEST_TIMEOUT_MS: "4000"
+          LIVE_TEST_PROCESS_TIMEOUT_SEC: "240"
           LIVE_TEST_ATTEMPTS: "2"
           LIVE_TEST_TCP_ATTEMPTS: "2"
           LIVE_TEST_TLS_ATTEMPTS: "2"
@@ -91,6 +95,6 @@ jobs:
           if git diff --cached --quiet; then
             echo "No changes to commit."
           else
-            git commit -m "Update generated files"
+            git commit -m "Mojtaba Reality Update V7.7"
             git push
           fi
