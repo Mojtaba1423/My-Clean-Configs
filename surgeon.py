@@ -1,411 +1,374 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+"""
+MOJTABA Surgeon V7.7
+- Strong extraction from mixed/base64-wrapped sources
+- Conservative VLESS parsing with normalization
+- Offline scoring + optional live probing
+- Per-host diversity limit
+- Telemetry for debugging in GitHub Actions
+"""
+
+from __future__ import annotations
+
 import base64
-import dataclasses
-from dataclasses import dataclass, field
+import binascii
 import json
 import os
+import random
 import re
 import socket
+import string
 import subprocess
 import sys
 import time
-from typing import Dict, List, Optional, Tuple
-from urllib.parse import parse_qs, quote, unquote, urlparse
+from dataclasses import dataclass, field
+from typing import Dict, Iterable, List, Optional, Set, Tuple
+from urllib.parse import parse_qs, unquote, urlsplit
 
-try:
-    import urllib.request
-    import urllib.error
-except Exception:
-    urllib = None
+import requests
 
 
-VERSION = "2.0-rewrite"
+OUTPUT_FILE = "MOJTABA_CLEAN_LIST.txt"
+TELEMETRY_FILE = "surgeon_telemetry.json"
 
-OUTPUT_FILE = os.getenv("MOJTABA_CLEAN_LIST_FILENAME", "MOJTABA_CLEAN_LIST.txt")
+DEFAULT_SOURCES = [
+    "https://raw.githubusercontent.com/soroushmirzaei/telegram-configs-collector/main/protocols/vless",
+    "https://raw.githubusercontent.com/mahsanet/MahsaFreeConfig/main/sub/sub_merge.txt",
+    "https://raw.githubusercontent.com/peasoft/NoMoreWalls/master/list_raw.txt",
+    "https://raw.githubusercontent.com/aiboboxx/v2rayfree/main/v2",
+    "https://raw.githubusercontent.com/mfuu/v2ray/master/v2ray",
+    "https://raw.githubusercontent.com/ALIILAPRO/v2rayNG-Config/main/sub.txt",
+]
+
+USER_AGENTS = [
+    "Mozilla/5.0",
+    "curl/8.0",
+    "Wget/1.21",
+]
+
+REQUEST_TIMEOUT = 20
+MAX_OUTPUT = int(os.getenv("MAX_OUTPUT", "128"))
+MAX_PER_HOST = int(os.getenv("MAX_PER_HOST", "2"))
+
 LIVE_TEST_BINARY = os.getenv("LIVE_TEST_BINARY", "./prober")
-LIVE_TEST_CONCURRENCY = int(os.getenv("LIVE_TEST_CONCURRENCY", "64"))
-LIVE_TEST_TIMEOUT_MS = int(os.getenv("LIVE_TEST_TIMEOUT_MS", "3500"))
-LIVE_TEST_PROCESS_TIMEOUT_SEC = int(os.getenv("LIVE_TEST_PROCESS_TIMEOUT_SEC", "120"))
+LIVE_TEST_CONCURRENCY = int(os.getenv("LIVE_TEST_CONCURRENCY", "250"))
+LIVE_TEST_TIMEOUT_MS = int(os.getenv("LIVE_TEST_TIMEOUT_MS", "4000"))
+LIVE_TEST_PROCESS_TIMEOUT_SEC = int(os.getenv("LIVE_TEST_PROCESS_TIMEOUT_SEC", "240"))
 LIVE_TEST_ATTEMPTS = int(os.getenv("LIVE_TEST_ATTEMPTS", "2"))
 LIVE_TEST_TCP_ATTEMPTS = int(os.getenv("LIVE_TEST_TCP_ATTEMPTS", "2"))
 LIVE_TEST_TLS_ATTEMPTS = int(os.getenv("LIVE_TEST_TLS_ATTEMPTS", "2"))
 LIVE_TEST_ATTEMPT_PAUSE_MS = int(os.getenv("LIVE_TEST_ATTEMPT_PAUSE_MS", "150"))
 
-MAX_OUTPUT = int(os.getenv("MAX_OUTPUT", "128"))
-MAX_PER_HOST = int(os.getenv("MAX_PER_HOST", "4"))
-MAX_PROBE_INPUT = int(os.getenv("MAX_PROBE_INPUT", "512"))
-
-REQUEST_TIMEOUT_SEC = int(os.getenv("REQUEST_TIMEOUT_SEC", "20"))
-
-DEFAULT_SOURCES = [
-    # می‌توانی با env جایگزین کنی
-]
-
-LINK_RE = re.compile(
-    r'(?i)\b(?:vless|vmess|trojan)://[^\s<>"\'`)\]]+'
-)
-
-BASE64_CHARS_RE = re.compile(r"^[A-Za-z0-9+/=_-]+$")
-HOST_RE = re.compile(r"^[A-Za-z0-9.-]+$")
-HEX_RE = re.compile(r"^[0-9a-fA-F]+$")
-
-GOLDEN_PORTS = {443, 2053, 2083, 2087, 2096, 8443, 80, 8080, 8880}
-GOOD_TYPES = {"tcp", "ws", "grpc", "httpupgrade", "splithttp", "xhttp"}
-GOOD_FPS = {"chrome", "firefox", "safari", "edge", "randomized", "random"}
-GOOD_SECURITIES = {"reality", "tls", "xtls", ""}
-
 
 @dataclass
 class Candidate:
-    raw_link: str
+    raw: str
     scheme: str
     uuid: str
     host: str
     port: int
-    tag: str = ""
-    params: Dict[str, str] = field(default_factory=dict)
-
+    path: str = "/"
     sni: str = ""
     security: str = ""
-    transport_type: str = ""
-    fp: str = ""
+    transport: str = ""
+    type_: str = ""
+    service_name: str = ""
     pbk: str = ""
     sid: str = ""
+    fp: str = ""
     flow: str = ""
-    encryption: str = ""
-    path: str = ""
-    service_name: str = ""
+    alpn: str = ""
+    remark: str = ""
+    query: Dict[str, str] = field(default_factory=dict)
 
-    source: str = ""
-    offline_score: float = 0.0
-    live_score: float = 0.0
-    final_score: float = 0.0
+    offline_score: int = 0
+    live_score: int = 0
+    total_score: int = 0
 
     tcp_ok: bool = False
     tls_ok: bool = False
-    tcp_latency_ms: float = 0.0
-    tls_latency_ms: float = 0.0
+    latency_ms: int = 999999
     error: str = ""
 
-    def unique_key(self) -> Tuple[str, int, str, str, str, str]:
+    def key(self) -> Tuple[str, int, str, str, str, str]:
         return (
             self.host.lower(),
             self.port,
-            self.uuid.lower(),
-            self.security.lower(),
-            self.transport_type.lower(),
-            self.pbk.lower(),
+            (self.sni or "").lower(),
+            (self.path or "/"),
+            (self.pbk or ""),
+            (self.sid or ""),
         )
+
+    def to_uri(self) -> str:
+        q = dict(self.query)
+
+        if self.type_:
+            q["type"] = self.type_
+        if self.security:
+            q["security"] = self.security
+        if self.sni:
+            q["sni"] = self.sni
+        if self.path:
+            q["path"] = self.path
+        if self.service_name:
+            q["serviceName"] = self.service_name
+        if self.pbk:
+            q["pbk"] = self.pbk
+        if self.sid:
+            q["sid"] = self.sid
+        if self.fp:
+            q["fp"] = self.fp
+        if self.flow:
+            q["flow"] = self.flow
+        if self.alpn:
+            q["alpn"] = self.alpn
+
+        parts = []
+        for k, v in q.items():
+            if v is None:
+                continue
+            parts.append(f"{k}={v}")
+        query = "&".join(parts)
+        fragment = self.remark or "MOJTABA"
+        return f"vless://{self.uuid}@{self.host}:{self.port}?{query}#{fragment}"
 
 
 def log(msg: str) -> None:
-    print(msg, file=sys.stderr)
+    print(msg, flush=True)
 
 
-def read_sources_from_env() -> List[str]:
-    raw = os.getenv("SURGEON_SOURCES", "").strip()
-    if not raw:
-        return DEFAULT_SOURCES[:]
-    parts = []
-    for x in raw.splitlines():
-        x = x.strip()
-        if x:
-            parts.append(x)
-    return parts
+def load_sources() -> List[str]:
+    env_sources = os.getenv("SOURCES", "").strip()
+    if env_sources:
+        return [x.strip() for x in env_sources.splitlines() if x.strip()]
+    return DEFAULT_SOURCES[:]
 
 
-def fetch_text(source: str) -> str:
-    if source.startswith("http://") or source.startswith("https://"):
-        req = urllib.request.Request(
-            source,
-            headers={
-                "User-Agent": "Mozilla/5.0 surgeon.py rewrite",
-                "Accept": "*/*",
-            },
-        )
-        with urllib.request.urlopen(req, timeout=REQUEST_TIMEOUT_SEC) as resp:
-            data = resp.read()
-            try:
-                return data.decode("utf-8")
-            except UnicodeDecodeError:
-                return data.decode("utf-8", errors="replace")
-    else:
-        with open(source, "r", encoding="utf-8", errors="replace") as f:
-            return f.read()
+def fetch_text(url: str) -> str:
+    headers = {"User-Agent": random.choice(USER_AGENTS)}
+    r = requests.get(url, headers=headers, timeout=REQUEST_TIMEOUT)
+    r.raise_for_status()
+    return r.text
 
 
-def normalize_base64(s: str) -> str:
-    s = s.strip()
-    s = re.sub(r"\s+", "", s)
-    s = s.replace("-", "+").replace("_", "/")
-    padding = len(s) % 4
-    if padding:
-        s += "=" * (4 - padding)
-    return s
+def is_probably_base64(s: str) -> bool:
+    t = "".join(s.strip().split())
+    if len(t) < 24:
+        return False
+    if len(t) % 4 != 0:
+        return False
+    return bool(re.fullmatch(r"[A-Za-z0-9+/=]+", t))
 
 
-def try_b64decode_text(s: str) -> Optional[str]:
-    s = s.strip()
-    if not s:
-        return None
-    compact = re.sub(r"\s+", "", s)
-    if len(compact) < 16:
-        return None
-    if not BASE64_CHARS_RE.match(compact):
-        return None
+def try_b64decode(s: str) -> Optional[str]:
+    t = "".join(s.strip().split())
     try:
-        decoded = base64.b64decode(normalize_base64(compact), validate=False)
-    except Exception:
+        data = base64.b64decode(t, validate=True)
+        return data.decode("utf-8", errors="ignore")
+    except (binascii.Error, ValueError):
         return None
-    if not decoded:
-        return None
-    try:
-        text = decoded.decode("utf-8")
-    except UnicodeDecodeError:
-        try:
-            text = decoded.decode("utf-8", errors="replace")
-        except Exception:
-            return None
-    printable = sum(1 for ch in text if ch.isprintable() or ch in "\r\n\t")
-    if not text or printable / max(1, len(text)) < 0.80:
-        return None
-    return text
 
 
-def maybe_decode_base64_layers(text: str, max_depth: int = 2) -> List[str]:
-    results = []
-    seen = set()
+def maybe_decode_base64_layers(text: str, max_layers: int = 3) -> List[str]:
+    seen: Set[str] = set()
+    out: List[str] = []
 
-    def rec(blob: str, depth: int) -> None:
-        if depth > max_depth:
+    def visit(t: str, depth: int) -> None:
+        if not t or t in seen:
             return
-        key = blob[:5000]
-        if key in seen:
+        seen.add(t)
+        out.append(t)
+        if depth >= max_layers:
             return
-        seen.add(key)
 
-        results.append(blob)
+        candidates = [t]
+        stripped = t.strip()
+        if is_probably_base64(stripped):
+            candidates.append(stripped)
 
-        decoded_whole = try_b64decode_text(blob)
-        if decoded_whole and decoded_whole != blob:
-            rec(decoded_whole, depth + 1)
+        for c in candidates:
+            decoded = try_b64decode(c)
+            if decoded and decoded not in seen:
+                visit(decoded, depth + 1)
 
-        for line in blob.splitlines():
-            line = line.strip()
-            if not line:
-                continue
-            decoded_line = try_b64decode_text(line)
-            if decoded_line and decoded_line != line:
-                rec(decoded_line, depth + 1)
+    visit(text, 0)
+    return out
 
-    rec(text, 0)
+
+def extract_candidate_uris(text: str) -> List[str]:
+    results: List[str] = []
+    seen: Set[str] = set()
+
+    pattern = re.compile(r"(vless://[^\s'\"<>]+)", re.IGNORECASE)
+
+    for layer in maybe_decode_base64_layers(text, max_layers=3):
+        for m in pattern.findall(layer):
+            u = m.strip()
+            if u and u not in seen:
+                seen.add(u)
+                results.append(u)
+
     return results
 
 
-def extract_proxy_links(text: str) -> List[str]:
-    found = []
-    seen = set()
-
-    for blob in maybe_decode_base64_layers(text, max_depth=2):
-        for m in LINK_RE.finditer(blob):
-            link = m.group(0).strip().strip('\'"')
-            if link not in seen:
-                seen.add(link)
-                found.append(link)
-
-    return found
+def normalize_host(host: str) -> str:
+    return host.strip().strip("[]").lower()
 
 
-def safe_first(q: Dict[str, List[str]], key: str) -> str:
-    val = q.get(key, [""])
-    return val[0].strip() if val else ""
+def parse_vless_candidate(uri: str) -> Optional[Candidate]:
+    if not uri.lower().startswith("vless://"):
+        return None
 
-
-def pick_sni(q: Dict[str, List[str]], host: str) -> str:
-    for key in ("sni", "serverName", "servername", "host"):
-        v = safe_first(q, key)
-        if v:
-            return v.strip()
-    return host
-
-
-def looks_like_hostname(host: str) -> bool:
-    if not host or len(host) > 253:
-        return False
-    if ":" in host and not HOST_RE.match(host.replace(":", "")):
-        # احتمال ipv6؛ فعلاً ساده نگه می‌داریم
-        return True
-    return bool(HOST_RE.match(host))
-
-
-def looks_like_ip(host: str) -> bool:
     try:
-        socket.inet_aton(host)
-        return True
-    except Exception:
-        return False
-
-
-def sanitize_sid(sid: str) -> str:
-    sid = sid.strip()
-    if not sid:
-        return ""
-    if HEX_RE.match(sid):
-        return sid.lower()
-    cleaned = re.sub(r"[^0-9a-fA-F]", "", sid)
-    return cleaned.lower()
-
-
-def parse_vless_candidate(link: str, source: str = "") -> Optional[Candidate]:
-    try:
-        u = urlparse(link)
+        parts = urlsplit(uri)
     except Exception:
         return None
 
-    if u.scheme.lower() != "vless":
+    if not parts.netloc or "@" not in parts.netloc:
         return None
 
-    host = (u.hostname or "").strip()
-    port = u.port or 0
-    uuid = unquote(u.username or "").strip()
-    tag = unquote(u.fragment or "").strip()
-    q = parse_qs(u.query, keep_blank_values=True)
-
-    if not host or not uuid or not (1 <= port <= 65535):
+    userinfo, hostport = parts.netloc.rsplit("@", 1)
+    uuid = userinfo.strip()
+    if not uuid:
         return None
 
-    if not looks_like_hostname(host) and not looks_like_ip(host):
+    if ":" not in hostport:
         return None
 
-    params = {k: safe_first(q, k) for k in q.keys()}
+    host, port_str = hostport.rsplit(":", 1)
+    host = normalize_host(host)
+    if not host:
+        return None
 
-    security = params.get("security", "").strip().lower()
-    transport_type = params.get("type", "").strip().lower()
-    fp = params.get("fp", "").strip().lower()
-    pbk = params.get("pbk", "").strip()
-    sid = sanitize_sid(params.get("sid", ""))
-    flow = params.get("flow", "").strip().lower()
-    encryption = params.get("encryption", "").strip().lower()
-    path = params.get("path", "").strip()
-    service_name = params.get("serviceName", params.get("service_name", "")).strip()
-    sni = pick_sni(q, host).strip()
+    try:
+        port = int(port_str)
+    except ValueError:
+        return None
+
+    if port <= 0 or port > 65535:
+        return None
+
+    query_map_raw = parse_qs(parts.query, keep_blank_values=True)
+    query = {k: (v[-1] if v else "") for k, v in query_map_raw.items()}
+
+    security = (query.get("security") or "").strip().lower()
+    transport = (query.get("type") or "").strip().lower()
+    path = unquote((query.get("path") or "/").strip() or "/")
+    sni = (query.get("sni") or query.get("serverName") or "").strip().lower()
+    service_name = (query.get("serviceName") or "").strip()
+    pbk = (query.get("pbk") or query.get("publicKey") or "").strip()
+    sid = (query.get("sid") or query.get("shortId") or "").strip()
+    fp = (query.get("fp") or query.get("fingerprint") or "").strip()
+    flow = (query.get("flow") or "").strip()
+    alpn = (query.get("alpn") or "").strip()
+    remark = unquote((parts.fragment or "").strip())
 
     c = Candidate(
-        raw_link=link,
+        raw=uri.strip(),
         scheme="vless",
         uuid=uuid,
         host=host,
         port=port,
-        tag=tag,
-        params=params,
-        sni=sni,
+        path=path if path.startswith("/") else f"/{path}",
+        sni=sni or host,
         security=security,
-        transport_type=transport_type,
-        fp=fp,
+        transport=transport,
+        type_=transport,
+        service_name=service_name,
         pbk=pbk,
         sid=sid,
+        fp=fp,
         flow=flow,
-        encryption=encryption,
-        path=path,
-        service_name=service_name,
-        source=source,
+        alpn=alpn,
+        remark=remark,
+        query=query,
     )
+
     return c
 
 
-def parse_candidate(link: str, source: str = "") -> Optional[Candidate]:
-    if not link:
-        return None
-    if link.lower().startswith("vless://"):
-        return parse_vless_candidate(link, source=source)
-    return None
+def score_candidate(c: Candidate) -> int:
+    score = 0
 
-
-def compute_offline_score(c: Candidate) -> float:
-    score = 0.0
-
-    if 1 <= c.port <= 65535:
-        score += 5
-
-    if c.port in GOLDEN_PORTS:
-        score += 10
+    if c.scheme == "vless":
+        score += 20
 
     if c.security == "reality":
-        score += 35
-    elif c.security in {"tls", "xtls"}:
-        score += 18
-    else:
-        score += 3
-
-    if c.transport_type == "tcp":
-        score += 18
-    elif c.transport_type in GOOD_TYPES:
-        score += 10
-    else:
-        score += 2
-
-    if c.fp in GOOD_FPS:
-        score += 8
-        if c.fp == "chrome":
-            score += 4
-
-    if c.pbk:
+        score += 40
+    elif c.security in ("tls", "xtls"):
         score += 15
-        if len(c.pbk) >= 20:
-            score += 5
+
+    if c.type_ in ("tcp", "ws", "grpc"):
+        score += 10
+
+    if c.type_ == "tcp":
+        score += 5
 
     if c.sni:
-        score += 10
-        if "." in c.sni:
-            score += 3
+        score += 8
+
+    if c.pbk:
+        score += 12
 
     if c.sid:
+        score += 6
+
+    if c.fp:
         score += 4
 
-    if c.flow in {"", "xtls-rprx-vision"}:
-        score += 5
-
-    if c.encryption in {"", "none"}:
-        score += 5
-
-    if c.path:
-        score += 2
+    if c.path and c.path != "/":
+        score += 3
 
     if c.service_name:
+        score += 3
+
+    if c.port in (443, 8443, 2053, 2083, 2087, 2096):
+        score += 8
+    elif 1 <= c.port <= 65535:
         score += 2
 
-    if looks_like_ip(c.host):
-        score -= 3
+    host = c.host.lower()
+    if re.fullmatch(r"\d+\.\d+\.\d+\.\d+", host):
+        score -= 2
     else:
         score += 4
 
-    if c.tag:
+    if len(host) >= 4:
+        score += 2
+
+    if c.remark:
         score += 1
 
     return score
 
 
-def build_probe_target(c: Candidate) -> Dict:
+def dedupe_candidates(cands: Iterable[Candidate]) -> List[Candidate]:
+    best: Dict[Tuple[str, int, str, str, str, str], Candidate] = {}
+    for c in cands:
+        k = c.key()
+        prev = best.get(k)
+        if prev is None or c.offline_score > prev.offline_score:
+            best[k] = c
+    return list(best.values())
+
+
+def build_probe_payload(cands: List[Candidate]) -> Dict:
+    targets = []
+    for idx, c in enumerate(cands):
+        targets.append(
+            {
+                "id": str(idx),
+                "host": c.host,
+                "port": c.port,
+                "sni": c.sni or c.host,
+            }
+        )
+
     return {
-        "id": f"{c.host}:{c.port}:{c.uuid[:8]}",
-        "host": c.host,
-        "port": c.port,
-        "sni": c.sni or c.host,
-    }
-
-
-def run_go_live_probe(candidates: List[Candidate]) -> Dict[str, Dict]:
-    if not candidates:
-        return {}
-
-    if not os.path.exists(LIVE_TEST_BINARY):
-        log(f"[warn] prober not found: {LIVE_TEST_BINARY}")
-        return {}
-
-    payload = {
-        "version": VERSION,
+        "version": "7.7",
         "mode": "tls",
         "concurrency": LIVE_TEST_CONCURRENCY,
         "timeout_ms": LIVE_TEST_TIMEOUT_MS,
@@ -413,234 +376,211 @@ def run_go_live_probe(candidates: List[Candidate]) -> Dict[str, Dict]:
         "tcp_attempts": LIVE_TEST_TCP_ATTEMPTS,
         "tls_attempts": LIVE_TEST_TLS_ATTEMPTS,
         "attempt_pause_ms": LIVE_TEST_ATTEMPT_PAUSE_MS,
-        "targets": [build_probe_target(c) for c in candidates],
+        "targets": targets,
     }
+
+
+def run_live_probe(cands: List[Candidate]) -> Dict[str, Dict]:
+    if not cands:
+        return {}
+
+    if not os.path.isfile(LIVE_TEST_BINARY):
+        log(f"[probe] binary not found: {LIVE_TEST_BINARY} -> offline only")
+        return {}
+
+    payload = build_probe_payload(cands)
+    data = json.dumps(payload).encode("utf-8")
 
     try:
         proc = subprocess.run(
             [LIVE_TEST_BINARY],
-            input=json.dumps(payload).encode("utf-8"),
+            input=data,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             timeout=LIVE_TEST_PROCESS_TIMEOUT_SEC,
             check=False,
         )
     except Exception as e:
-        log(f"[warn] prober execution failed: {e}")
+        log(f"[probe] process failed: {e}")
         return {}
 
-    if proc.returncode != 0:
-        log(f"[warn] prober return code={proc.returncode}")
-        if proc.stderr:
-            log(proc.stderr.decode("utf-8", errors="replace"))
+    if proc.stderr:
+        log(f"[probe][stderr] {proc.stderr.decode('utf-8', errors='ignore').strip()}")
+
+    if not proc.stdout:
+        log("[probe] empty stdout -> offline only")
         return {}
 
     try:
-        response = json.loads(proc.stdout.decode("utf-8", errors="replace"))
+        obj = json.loads(proc.stdout.decode("utf-8", errors="ignore"))
     except Exception as e:
-        log(f"[warn] invalid prober json: {e}")
+        log(f"[probe] invalid json: {e}")
         return {}
 
     results = {}
-    for item in response.get("results", []):
-        rid = str(item.get("id", ""))
+    for item in obj.get("results", []) or []:
+        rid = str(item.get("id", "")).strip()
         if rid:
             results[rid] = item
     return results
 
 
-def apply_live_results(candidates: List[Candidate], live_results: Dict[str, Dict]) -> None:
-    for c in candidates:
-        rid = f"{c.host}:{c.port}:{c.uuid[:8]}"
-        item = live_results.get(rid)
+def apply_live_results(cands: List[Candidate], result_map: Dict[str, Dict]) -> None:
+    for idx, c in enumerate(cands):
+        item = result_map.get(str(idx))
         if not item:
+            c.live_score = 0
+            c.total_score = c.offline_score
             continue
 
         c.tcp_ok = bool(item.get("tcp_ok", False))
         c.tls_ok = bool(item.get("tls_ok", False))
-        c.tcp_latency_ms = float(item.get("tcp_latency_ms", 0.0) or 0.0)
-        c.tls_latency_ms = float(item.get("tls_latency_ms", 0.0) or 0.0)
-        c.error = str(item.get("error", "") or "")
+        c.latency_ms = int(item.get("latency_ms", 999999) or 999999)
 
-        live = 0.0
+        err = str(item.get("error", "") or "").strip()
+        tls_err = str(item.get("tls_error", "") or "").strip()
+        c.error = err or tls_err
+
+        live = 0
         if c.tcp_ok:
-            live += 25
+            live += 20
         if c.tls_ok:
-            live += 35
+            live += 45
 
-        if c.tcp_latency_ms > 0:
-            live += max(0.0, 20.0 - min(c.tcp_latency_ms, 4000.0) / 200.0)
-
-        if c.tls_latency_ms > 0:
-            live += max(0.0, 25.0 - min(c.tls_latency_ms, 4000.0) / 160.0)
+        if c.latency_ms < 150:
+            live += 20
+        elif c.latency_ms < 400:
+            live += 12
+        elif c.latency_ms < 900:
+            live += 5
 
         c.live_score = live
-        c.final_score = c.offline_score + c.live_score
+        c.total_score = c.offline_score + c.live_score
 
 
-def dedupe_candidates(candidates: List[Candidate]) -> List[Candidate]:
-    best = {}
-    for c in candidates:
-        key = c.unique_key()
-        prev = best.get(key)
-        if prev is None or c.offline_score > prev.offline_score:
-            best[key] = c
-    return list(best.values())
+def finalize_scores(cands: List[Candidate]) -> None:
+    for c in cands:
+        if c.total_score == 0:
+            c.total_score = c.offline_score
 
 
-def rewrite_with_final_tag(c: Candidate, idx: int) -> str:
-    q = dict(c.params)
-
-    if c.security:
-        q["security"] = c.security
-    if c.transport_type:
-        q["type"] = c.transport_type
-    if c.sni:
-        q["sni"] = c.sni
-    if c.fp:
-        q["fp"] = c.fp
-    if c.pbk:
-        q["pbk"] = c.pbk
-    if c.sid:
-        q["sid"] = c.sid
-    if c.flow:
-        q["flow"] = c.flow
-    if c.encryption:
-        q["encryption"] = c.encryption
-    if c.path:
-        q["path"] = c.path
-    if c.service_name:
-        q["serviceName"] = c.service_name
-
-    query_parts = []
-    for k in sorted(q.keys()):
-        query_parts.append(f"{quote(str(k))}={quote(str(q[k]))}")
-
-    query = "&".join(query_parts)
-    tag = c.tag or f"MOJTABA-{idx}"
-    return f"vless://{quote(c.uuid)}@{c.host}:{c.port}?{query}#{quote(tag)}"
-
-
-def final_select(candidates: List[Candidate], max_output: int = MAX_OUTPUT) -> List[Candidate]:
-    for c in candidates:
-        if c.final_score <= 0:
-            c.final_score = c.offline_score + c.live_score
-
+def select_best(cands: List[Candidate], max_output: int, max_per_host: int) -> List[Candidate]:
     ordered = sorted(
-        candidates,
+        cands,
         key=lambda x: (
+            x.total_score,
+            x.live_score,
+            x.offline_score,
             x.tls_ok,
             x.tcp_ok,
-            x.final_score,
-            x.offline_score,
-            -x.tls_latency_ms if x.tls_latency_ms > 0 else 0,
-            -x.tcp_latency_ms if x.tcp_latency_ms > 0 else 0,
+            -x.latency_ms,
         ),
         reverse=True,
     )
 
-    selected = []
-    host_count: Dict[str, int] = {}
+    selected: List[Candidate] = []
+    host_counts: Dict[str, int] = {}
 
     for c in ordered:
-        h = c.host.lower()
-        if host_count.get(h, 0) >= MAX_PER_HOST:
-            continue
-        selected.append(c)
-        host_count[h] = host_count.get(h, 0) + 1
         if len(selected) >= max_output:
             break
+        cnt = host_counts.get(c.host, 0)
+        if cnt >= max_per_host:
+            continue
+        selected.append(c)
+        host_counts[c.host] = cnt + 1
 
     return selected
 
 
-def write_output(selected: List[Candidate]) -> None:
-    lines = [rewrite_with_final_tag(c, i + 1) for i, c in enumerate(selected)]
-    with open(OUTPUT_FILE, "w", encoding="utf-8", newline="\n") as f:
-        f.write("\n".join(lines).strip() + ("\n" if lines else ""))
+def write_output(cands: List[Candidate], path: str) -> None:
+    lines = [c.to_uri() for c in cands]
+    with open(path, "w", encoding="utf-8") as f:
+        f.write("\n".join(lines).strip())
+        if lines:
+            f.write("\n")
 
 
-def collect_all_links(sources: List[str]) -> List[Tuple[str, str]]:
-    collected = []
-
-    for source in sources:
-        try:
-            text = fetch_text(source)
-        except Exception as e:
-            log(f"[warn] fetch failed for {source}: {e}")
-            continue
-
-        links = extract_proxy_links(text)
-        vless_links = [x for x in links if x.lower().startswith("vless://")]
-
-        log(f"[info] source={source} links={len(links)} vless={len(vless_links)}")
-
-        for link in vless_links:
-            collected.append((source, link))
-
-    return collected
+def write_telemetry(data: Dict) -> None:
+    with open(TELEMETRY_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
 
 
 def main() -> int:
-    t0 = time.time()
+    started = time.time()
+    telemetry = {
+        "version": "7.7",
+        "sources": [],
+        "fetched_sources": 0,
+        "extracted_uris": 0,
+        "parsed_candidates": 0,
+        "deduped_candidates": 0,
+        "live_results": 0,
+        "selected": 0,
+        "output_file": OUTPUT_FILE,
+        "errors": [],
+    }
 
-    sources = read_sources_from_env()
-    if not sources:
-        log("[warn] no sources configured in SURGEON_SOURCES and DEFAULT_SOURCES is empty")
-        write_output([])
-        return 0
+    sources = load_sources()
+    telemetry["sources"] = sources
 
-    log(f"[info] surgeon version={VERSION}")
-    log(f"[info] sources={len(sources)}")
+    all_uris: List[str] = []
 
-    raw_links = collect_all_links(sources)
-    log(f"[info] raw vless links={len(raw_links)}")
+    log(f"[fetch] sources={len(sources)}")
+    for url in sources:
+        try:
+            text = fetch_text(url)
+            telemetry["fetched_sources"] += 1
+            uris = extract_candidate_uris(text)
+            all_uris.extend(uris)
+            log(f"[extract] {url} -> {len(uris)} uri(s)")
+        except Exception as e:
+            msg = f"{url}: {e}"
+            telemetry["errors"].append(msg)
+            log(f"[error] {msg}")
 
-    parsed = []
-    rejected = 0
+    telemetry["extracted_uris"] = len(all_uris)
 
-    for source, link in raw_links:
-        c = parse_candidate(link, source=source)
-        if c is None:
-            rejected += 1
+    parsed: List[Candidate] = []
+    for uri in all_uris:
+        c = parse_vless_candidate(uri)
+        if not c:
             continue
-        c.offline_score = compute_offline_score(c)
-        c.final_score = c.offline_score
+        c.offline_score = score_candidate(c)
+        c.total_score = c.offline_score
         parsed.append(c)
 
-    log(f"[info] parsed={len(parsed)} rejected={rejected}")
+    telemetry["parsed_candidates"] = len(parsed)
+    log(f"[parse] parsed={len(parsed)}")
 
     deduped = dedupe_candidates(parsed)
-    log(f"[info] deduped={len(deduped)}")
+    telemetry["deduped_candidates"] = len(deduped)
+    log(f"[dedupe] deduped={len(deduped)}")
 
-    if not deduped:
-        log("[warn] no valid candidates after parsing/dedup")
-        write_output([])
-        return 0
+    live_results = run_live_probe(deduped)
+    telemetry["live_results"] = len(live_results)
+    log(f"[probe] results={len(live_results)}")
 
-    preprobe = sorted(deduped, key=lambda x: x.offline_score, reverse=True)[:MAX_PROBE_INPUT]
-    log(f"[info] preprobe={len(preprobe)}")
+    apply_live_results(deduped, live_results)
+    finalize_scores(deduped)
 
-    live_results = run_go_live_probe(preprobe)
-    log(f"[info] live_results={len(live_results)}")
+    selected = select_best(deduped, MAX_OUTPUT, MAX_PER_HOST)
+    telemetry["selected"] = len(selected)
+    log(f"[select] selected={len(selected)}")
 
-    apply_live_results(preprobe, live_results)
+    write_output(selected, OUTPUT_FILE)
 
-    # merge updated probe scores back
-    preprobe_map = {c.unique_key(): c for c in preprobe}
-    merged = []
-    for c in deduped:
-        merged.append(preprobe_map.get(c.unique_key(), c))
+    telemetry["duration_sec"] = round(time.time() - started, 3)
+    telemetry["output_nonempty"] = os.path.isfile(OUTPUT_FILE) and os.path.getsize(OUTPUT_FILE) > 0
+    write_telemetry(telemetry)
 
-    selected = final_select(merged, max_output=MAX_OUTPUT)
-    log(f"[info] selected={len(selected)}")
+    if not selected:
+        log("[final] no candidate selected")
+        return 1
 
-    write_output(selected)
-
-    dt = time.time() - t0
-    log(f"[info] done in {dt:.2f}s output={OUTPUT_FILE}")
+    log(f"[final] wrote {len(selected)} configs to {OUTPUT_FILE}")
     return 0
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    sys.exit(main())
