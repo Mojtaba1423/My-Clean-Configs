@@ -1,23 +1,20 @@
-# surgeon.py
 # -*- coding: utf-8 -*-
 
 """
-MOJTABA Surgeon V7.5
+MOJTABA Surgeon V7.6 (Safe Stability/Diversity Rebuild)
 
-External contract stays stable:
+External contract:
   - main file: surgeon.py
   - output: MOJTABA_CLEAN_LIST.txt
   - telemetry: surgeon_telemetry.json
 
-V7.5 goals:
+Goals:
   1) Keep GitHub Actions light and fast
   2) Keep Go prober as the live-test engine
-  3) Upgrade live ranking from TCP-only to TCP + TLS-ready
-  4) Prefer configs that pass TLS handshake when prober supports it
-  5) Apply Mojtaba naming tiers by final rank:
-       1..5      -> 🕯️🖤 Mojtaba1423
-       6..N      -> 🌙⚫ @mojtaba_1423
-       rest      -> 🦂🌑 M_1423
+  3) Rank by general stability, not one-shot luck
+  4) Reduce cluster dominance with diversity-aware selection
+  5) Keep only a single final output file
+  6) Preserve Mojtaba naming tiers by final rank
 """
 
 from __future__ import annotations
@@ -40,13 +37,18 @@ from urllib.parse import parse_qs, quote, unquote, urlsplit
 import requests
 
 
-VERSION = "7.5"
+VERSION = "7.6"
 
 OUTPUT_FILE = "MOJTABA_CLEAN_LIST.txt"
 TELEMETRY_FILE = "surgeon_telemetry.json"
 
 MAX_OUTPUT = int(os.environ.get("MAX_OUTPUT", "128"))
+
 MAX_PER_HOST = int(os.environ.get("MAX_PER_HOST", "2"))
+MAX_PER_SNI = int(os.environ.get("MAX_PER_SNI", "3"))
+MAX_PER_FP = int(os.environ.get("MAX_PER_FP", "16"))
+MAX_PER_PORT = int(os.environ.get("MAX_PER_PORT", "64"))
+MAX_PER_FAMILY = int(os.environ.get("MAX_PER_FAMILY", "2"))
 
 REQUIRED_SECURITY = "reality"
 REQUIRED_TYPE = "tcp"
@@ -81,7 +83,6 @@ SOURCES = [
     "https://raw.githubusercontent.com/mohamadfg-dev/telegram-v2ray-configs-collector/refs/heads/main/category/vless.txt",
     "https://raw.githubusercontent.com/DukeMehdi/FreeList-V2ray-Configs/refs/heads/main/Configs/VLESS-DukeMehdi-Configs.txt",
     "https://raw.githubusercontent.com/SoliSpirit/v2ray-configs/refs/heads/main/Protocols/vless.txt",
-
     "https://raw.githubusercontent.com/V2RAYCONFIGSPOOL/V2RAY_SUB/refs/heads/main/v2ray_configs_no1.txt",
     "https://raw.githubusercontent.com/V2RAYCONFIGSPOOL/V2RAY_SUB/refs/heads/main/v2ray_configs_no2.txt",
     "https://raw.githubusercontent.com/V2RAYCONFIGSPOOL/V2RAY_SUB/refs/heads/main/v2ray_configs_no3.txt",
@@ -96,18 +97,14 @@ SOURCES = [
 
 EXTRA_SOURCES = []
 
-SOURCE_BONUS = {
-    # "https://example.com/source.txt": 4.0,
-}
+SOURCE_BONUS = {}
 
 VLESS_RE = re.compile(r"vless://[^\s\"\'<>\)\]]+", re.IGNORECASE)
 B64_CLEAN_RE = re.compile(r"^[A-Za-z0-9+/=_\-\s\r\n]+$")
-
 HOSTNAME_RE = re.compile(
     r"^(?=.{1,253}$)(?!-)[A-Za-z0-9-]{1,63}(?<!-)"
     r"(\.(?!-)[A-Za-z0-9-]{1,63}(?<!-))*\.?$"
 )
-
 HEX_RE = re.compile(r"^[0-9a-fA-F]+$")
 
 
@@ -139,6 +136,7 @@ class Candidate:
 
     offline_score: float = 0.0
     dedupe_key: str = ""
+    family_key: str = ""
 
     tcp_ok: bool = False
     tcp_latency_ms: Optional[float] = None
@@ -148,9 +146,15 @@ class Candidate:
 
     live_score: float = 0.0
     total_score: float = 0.0
+    selection_score: float = 0.0
 
     live_error: str = ""
     tls_error: str = ""
+
+    tcp_attempts: int = 0
+    tcp_successes: int = 0
+    tls_attempts: int = 0
+    tls_successes: int = 0
 
     normalized_url: str = ""
 
@@ -195,6 +199,13 @@ class Telemetry:
     live_tls_latency_p50_ms: Optional[float] = None
     live_tls_latency_p90_ms: Optional[float] = None
     live_tls_latency_max_ms: Optional[float] = None
+
+    selected_unique_hosts: int = 0
+    selected_unique_sni: int = 0
+    selected_unique_fp: int = 0
+    selected_unique_ports: int = 0
+    selected_unique_families: int = 0
+    selected_top_family_share: float = 0.0
 
     final_selected: int = 0
 
@@ -298,6 +309,28 @@ def choose_sni(q: Dict[str, str]) -> str:
 
 def source_bonus(source: str) -> float:
     return float(SOURCE_BONUS.get(source, 0.0))
+
+
+def sid_group(sid: str) -> str:
+    sid = (sid or "").strip().lower()
+    if not sid:
+        return "empty"
+    n = len(sid)
+    if n <= 8:
+        return "short"
+    if n <= 16:
+        return "medium"
+    if n <= 32:
+        return "long"
+    return "xlong"
+
+
+def make_family_key(host: str, port: int, q: Dict[str, str]) -> str:
+    sni = choose_sni(q)
+    fp = (q.get("fp", "") or "").strip().lower()
+    flow = (q.get("flow", "") or "").strip().lower()
+    sidg = sid_group(q.get("sid", ""))
+    return f"{host}|{port}|{sni}|{fp}|{flow}|{sidg}"
 
 
 def hostname_quality_score(host: str) -> float:
@@ -634,6 +667,7 @@ def parse_candidate(raw_url: str, source: str, tel: Telemetry) -> Optional[Candi
     tag = normalize_tag(u.fragment or "")
     offline_score = compute_offline_score(source, host, port, q, tag)
     dedupe_key = make_dedupe_key(userinfo, host, port, q)
+    family_key = make_family_key(host, port, q)
 
     c = Candidate(
         raw_url=raw_url,
@@ -645,6 +679,7 @@ def parse_candidate(raw_url: str, source: str, tel: Telemetry) -> Optional[Candi
         tag=tag,
         offline_score=offline_score,
         dedupe_key=dedupe_key,
+        family_key=family_key,
     )
 
     c.normalized_url = build_normalized_url(c)
@@ -782,27 +817,64 @@ def latency_score(latency_ms: Optional[float], kind: str = "tcp") -> float:
     return -8.0
 
 
+def ratio_score(successes: int, attempts: int, kind: str = "tcp") -> float:
+    if attempts <= 0:
+        return 0.0
+    r = successes / attempts
+
+    if kind == "tls":
+        if r >= 1.0:
+            return 45.0
+        if r >= 0.75:
+            return 28.0
+        if r >= 0.5:
+            return 12.0
+        return -20.0
+
+    if r >= 1.0:
+        return 28.0
+    if r >= 0.75:
+        return 18.0
+    if r >= 0.5:
+        return 8.0
+    return -12.0
+
+
 def compute_live_score(
     tcp_ok: bool,
     tcp_latency_ms: Optional[float],
     tls_ok: bool,
     tls_latency_ms: Optional[float],
     tls_supported: bool,
+    tcp_attempts: int = 0,
+    tcp_successes: int = 0,
+    tls_attempts: int = 0,
+    tls_successes: int = 0,
 ) -> float:
-    if not tcp_ok:
+    if not tcp_ok and tcp_successes <= 0:
         return 0.0
 
-    score = 45.0
+    score = 30.0
+
+    if tcp_ok:
+        score += 18.0
+
     score += latency_score(tcp_latency_ms, "tcp")
 
+    if tcp_attempts > 0:
+        score += ratio_score(tcp_successes, tcp_attempts, "tcp")
+
     if tls_supported:
-        if tls_ok:
-            score += 80.0
+        if tls_ok or tls_successes > 0:
+            score += 55.0
             score += latency_score(tls_latency_ms, "tls")
         else:
-            score -= 35.0
+            score -= 28.0
+
+        if tls_attempts > 0:
+            score += ratio_score(tls_successes, tls_attempts, "tls")
     else:
-        score += 35.0
+        score += 25.0
 
     return max(5.0, score)
 
@@ -811,6 +883,33 @@ def safe_float(value) -> Optional[float]:
     if isinstance(value, (int, float)):
         return float(value)
     return None
+
+
+def parse_attempt_stats(item: dict) -> Tuple[int, int, int, int]:
+    tcp_attempts = 0
+    tcp_successes = 0
+    tls_attempts = 0
+    tls_successes = 0
+
+    if isinstance(item.get("tcp_attempts"), int):
+        tcp_attempts = max(0, int(item.get("tcp_attempts")))
+    if isinstance(item.get("tcp_successes"), int):
+        tcp_successes = max(0, int(item.get("tcp_successes")))
+
+    if isinstance(item.get("tls_attempts"), int):
+        tls_attempts = max(0, int(item.get("tls_attempts")))
+    if isinstance(item.get("tls_successes"), int):
+        tls_successes = max(0, int(item.get("tls_successes")))
+
+    if tcp_attempts == 0:
+        tcp_attempts = 1
+        tcp_successes = 1 if bool(item.get("tcp_ok", False)) else 0
+
+    if ("tls_ok" in item or "tls_latency_ms" in item or "tls_error" in item) and tls_attempts == 0:
+        tls_attempts = 1
+        tls_successes = 1 if bool(item.get("tls_ok", False)) else 0
+
+    return tcp_attempts, tcp_successes, tls_attempts, tls_successes
 
 
 def merge_live_probe_scores(candidates: List[Candidate], results: Dict[str, dict], tel: Telemetry) -> None:
@@ -831,15 +930,21 @@ def merge_live_probe_scores(candidates: List[Candidate], results: Dict[str, dict
             continue
 
         c.tcp_ok = bool(item.get("tcp_ok", False))
+        c.tls_ok = bool(item.get("tls_ok", False))
 
         tcp_lat = item.get("tcp_latency_ms", item.get("latency_ms", None))
         c.tcp_latency_ms = safe_float(tcp_lat)
-
-        c.tls_ok = bool(item.get("tls_ok", False))
         c.tls_latency_ms = safe_float(item.get("tls_latency_ms", None))
 
         c.live_error = str(item.get("error", "") or "")
         c.tls_error = str(item.get("tls_error", "") or "")
+
+        (
+            c.tcp_attempts,
+            c.tcp_successes,
+            c.tls_attempts,
+            c.tls_successes,
+        ) = parse_attempt_stats(item)
 
         c.live_score = compute_live_score(
             c.tcp_ok,
@@ -847,6 +952,10 @@ def merge_live_probe_scores(candidates: List[Candidate], results: Dict[str, dict
             c.tls_ok,
             c.tls_latency_ms,
             tel.live_probe_tls_supported,
+            c.tcp_attempts,
+            c.tcp_successes,
+            c.tls_attempts,
+            c.tls_successes,
         )
 
         tel.live_total_tested += 1
@@ -920,61 +1029,231 @@ def assign_total_scores(candidates: List[Candidate], live_worked: bool, tls_supp
     for c in candidates:
         if live_worked:
             if tls_supported:
-                c.total_score = (c.live_score * 1.0) + (c.offline_score * 0.16)
+                c.total_score = (c.live_score * 1.0) + (c.offline_score * 0.18)
             else:
-                c.total_score = (c.live_score * 1.0) + (c.offline_score * 0.20)
+                c.total_score = (c.live_score * 1.0) + (c.offline_score * 0.22)
         else:
             c.total_score = c.offline_score
 
 
-def final_select(candidates: List[Candidate], tls_supported: bool, live_worked: bool) -> List[Candidate]:
-    def sort_key(c: Candidate):
-        tls_rank = 1 if c.tls_ok else 0
-        tcp_rank = 1 if c.tcp_ok else 0
+def similarity_penalty(
+    c: Candidate,
+    per_host: Dict[str, int],
+    per_sni: Dict[str, int],
+    per_fp: Dict[str, int],
+    per_port: Dict[int, int],
+    per_family: Dict[str, int],
+) -> float:
+    sni = choose_sni(c.query)
+    fp = (c.query.get("fp", "") or "").strip().lower()
 
-        tcp_lat = c.tcp_latency_ms if c.tcp_latency_ms is not None else 999999.0
-        tls_lat = c.tls_latency_ms if c.tls_latency_ms is not None else 999999.0
+    penalty = 0.0
+    penalty += per_host[c.host] * 8.0
+    penalty += per_sni[sni] * 5.0
+    penalty += per_fp[fp] * 2.0
+    penalty += per_port[c.port] * 0.75
+    penalty += per_family[c.family_key] * 14.0
 
-        if tls_supported:
-            return (
-                c.total_score,
-                tls_rank,
-                tcp_rank,
-                -tls_lat,
-                -tcp_lat,
-                c.offline_score,
-                1 if c.port == 443 else 0,
-            )
+    return penalty
 
+
+def final_sort_key(c: Candidate, tls_supported: bool):
+    tls_rank = 1 if c.tls_ok else 0
+    tcp_rank = 1 if c.tcp_ok else 0
+
+    tcp_lat = c.tcp_latency_ms if c.tcp_latency_ms is not None else 999999.0
+    tls_lat = c.tls_latency_ms if c.tls_latency_ms is not None else 999999.0
+
+    if tls_supported:
         return (
-            c.total_score,
+            c.selection_score,
+            tls_rank,
             tcp_rank,
+            -tls_lat,
             -tcp_lat,
+            c.live_score,
             c.offline_score,
             1 if c.port == 443 else 0,
         )
 
-    ordered = sorted(candidates, key=sort_key, reverse=True)
+    return (
+        c.selection_score,
+        tcp_rank,
+        -tcp_lat,
+        c.live_score,
+        c.offline_score,
+        1 if c.port == 443 else 0,
+    )
 
-    chosen = []
+
+def enrich_selection_scores(candidates: List[Candidate], tls_supported: bool) -> List[Candidate]:
+    ranked = []
+
+    seed_order = sorted(
+        candidates,
+        key=lambda c: (
+            c.total_score,
+            1 if c.tls_ok else 0,
+            1 if c.tcp_ok else 0,
+            c.offline_score,
+        ),
+        reverse=True,
+    )
+
     per_host = defaultdict(int)
+    per_sni = defaultdict(int)
+    per_fp = defaultdict(int)
+    per_port = defaultdict(int)
+    per_family = defaultdict(int)
+
+    for c in seed_order:
+        sni = choose_sni(c.query)
+        fp = (c.query.get("fp", "") or "").strip().lower()
+
+        penalty = similarity_penalty(c, per_host, per_sni, per_fp, per_port, per_family)
+        bonus = 0.0
+
+        if per_host[c.host] == 0:
+            bonus += 8.0
+        if per_sni[sni] == 0:
+            bonus += 6.0
+        if per_family[c.family_key] == 0:
+            bonus += 12.0
+        if c.port == 443:
+            bonus += 1.0
+
+        c.selection_score = c.total_score + bonus - penalty
+        ranked.append(c)
+
+        per_host[c.host] += 1
+        per_sni[sni] += 1
+        per_fp[fp] += 1
+        per_port[c.port] += 1
+        per_family[c.family_key] += 1
+
+    ranked.sort(key=lambda x: final_sort_key(x, tls_supported), reverse=True)
+    return ranked
+
+
+def final_select(candidates: List[Candidate], tls_supported: bool, live_worked: bool) -> List[Candidate]:
+    ordered = enrich_selection_scores(candidates, tls_supported=tls_supported)
+
+    chosen: List[Candidate] = []
+
+    per_host = defaultdict(int)
+    per_sni = defaultdict(int)
+    per_fp = defaultdict(int)
+    per_port = defaultdict(int)
+    per_family = defaultdict(int)
 
     any_tcp_ok = live_worked and any(x.tcp_ok for x in ordered)
+    any_tls_ok = live_worked and tls_supported and any(x.tls_ok for x in ordered)
 
-    for c in ordered:
-        if len(chosen) >= MAX_OUTPUT:
-            break
+    def can_take(c: Candidate) -> bool:
+        sni = choose_sni(c.query)
+        fp = (c.query.get("fp", "") or "").strip().lower()
 
         if per_host[c.host] >= MAX_PER_HOST:
-            continue
+            return False
+        if per_sni[sni] >= MAX_PER_SNI:
+            return False
+        if per_fp[fp] >= MAX_PER_FP:
+            return False
+        if per_port[c.port] >= MAX_PER_PORT:
+            return False
+        if per_family[c.family_key] >= MAX_PER_FAMILY:
+            return False
+        return True
 
-        if any_tcp_ok and c.tcp_ok is False:
-            continue
+    def add_candidate(c: Candidate) -> None:
+        sni = choose_sni(c.query)
+        fp = (c.query.get("fp", "") or "").strip().lower()
 
         chosen.append(c)
         per_host[c.host] += 1
+        per_sni[sni] += 1
+        per_fp[fp] += 1
+        per_port[c.port] += 1
+        per_family[c.family_key] += 1
+
+    # Pass 1: strongest live winners with unique-ish families
+    for c in ordered:
+        if len(chosen) >= MAX_OUTPUT:
+            break
+        if any_tls_ok and not c.tls_ok:
+            continue
+        if any_tcp_ok and not c.tcp_ok:
+            continue
+        if not can_take(c):
+            continue
+        add_candidate(c)
+
+    # Pass 2: tcp-okay diverse fill
+    if len(chosen) < MAX_OUTPUT:
+        for c in ordered:
+            if len(chosen) >= MAX_OUTPUT:
+                break
+            if c in chosen:
+                continue
+            if any_tcp_ok and not c.tcp_ok:
+                continue
+            if not can_take(c):
+                continue
+            add_candidate(c)
+
+    # Pass 3: best remaining regardless of live class if probe was weak/unavailable
+    if len(chosen) < MAX_OUTPUT:
+        for c in ordered:
+            if len(chosen) >= MAX_OUTPUT:
+                break
+            if c in chosen:
+                continue
+            if not can_take(c):
+                continue
+            add_candidate(c)
 
     return chosen
+
+
+def compute_selection_telemetry(selected: List[Candidate], tel: Telemetry) -> None:
+    if not selected:
+        tel.selected_unique_hosts = 0
+        tel.selected_unique_sni = 0
+        tel.selected_unique_fp = 0
+        tel.selected_unique_ports = 0
+        tel.selected_unique_families = 0
+        tel.selected_top_family_share = 0.0
+        return
+
+    sni_set = set()
+    fp_set = set()
+    host_set = set()
+    port_set = set()
+    family_set = set()
+    family_counter = Counter()
+
+    for c in selected:
+        host_set.add(c.host)
+        port_set.add(c.port)
+        family_set.add(c.family_key)
+        family_counter[c.family_key] += 1
+
+        sni = choose_sni(c.query)
+        if sni:
+            sni_set.add(sni)
+
+        fp = (c.query.get("fp", "") or "").strip().lower()
+        if fp:
+            fp_set.add(fp)
+
+    tel.selected_unique_hosts = len(host_set)
+    tel.selected_unique_sni = len(sni_set)
+    tel.selected_unique_fp = len(fp_set)
+    tel.selected_unique_ports = len(port_set)
+    tel.selected_unique_families = len(family_set)
+
+    top_family_count = family_counter.most_common(1)[0][1] if family_counter else 0
+    tel.selected_top_family_share = round(top_family_count / len(selected), 4)
 
 
 def make_final_tag(c: Candidate, rank: int) -> str:
@@ -1056,6 +1335,22 @@ def write_telemetry(tel: Telemetry) -> None:
                 },
             },
         },
+        "selection": {
+            "max_output": MAX_OUTPUT,
+            "caps": {
+                "per_host": MAX_PER_HOST,
+                "per_sni": MAX_PER_SNI,
+                "per_fp": MAX_PER_FP,
+                "per_port": MAX_PER_PORT,
+                "per_family": MAX_PER_FAMILY,
+            },
+            "unique_hosts": tel.selected_unique_hosts,
+            "unique_sni": tel.selected_unique_sni,
+            "unique_fp": tel.selected_unique_fp,
+            "unique_ports": tel.selected_unique_ports,
+            "unique_families": tel.selected_unique_families,
+            "top_family_share": tel.selected_top_family_share,
+        },
         "naming": {
             "top_1_to": TOP_NAME_COUNT,
             "middle_6_to": MIDDLE_NAME_UNTIL,
@@ -1136,7 +1431,7 @@ def main() -> None:
             live_worked=tel.live_probe_succeeded,
             tls_supported=tel.live_probe_tls_supported,
         )
-    
+
         selected = final_select(
             deduped,
             tls_supported=tel.live_probe_tls_supported,
@@ -1144,6 +1439,7 @@ def main() -> None:
         )
 
         tel.final_selected = len(selected)
+        compute_selection_telemetry(selected, tel)
 
         write_output(selected)
         write_telemetry(tel)
@@ -1157,6 +1453,9 @@ def main() -> None:
         print(f"TLS supported by prober: {tel.live_probe_tls_supported}")
         print(f"TCP success: {tel.live_tcp_success}")
         print(f"TLS success: {tel.live_tls_success}")
+        print(f"Selected unique hosts: {tel.selected_unique_hosts}")
+        print(f"Selected unique SNI: {tel.selected_unique_sni}")
+        print(f"Selected unique families: {tel.selected_unique_families}")
         print(f"Final selected: {tel.final_selected}")
 
     except Exception as e:
