@@ -1,4 +1,4 @@
-name: Mojtaba Reality Update V7.5
+name: Mojtaba Reality Update V7.6
 
 on:
   workflow_dispatch:
@@ -46,28 +46,27 @@ jobs:
           LIVE_TEST_CONCURRENCY: "400"
           LIVE_TEST_TIMEOUT_MS: "2500"
           LIVE_TEST_PROCESS_TIMEOUT_SEC: "180"
+          LIVE_TEST_ATTEMPTS: "2"
+          LIVE_TEST_ATTEMPT_PAUSE_MS: "150"
           MAX_OUTPUT: "128"
           MAX_PER_HOST: "2"
         run: |
           python surgeon.py
 
+      - name: Show telemetry
+        if: always()
+        run: |
+          if [[ -f surgeon_telemetry.json ]]; then
+            echo "=== surgeon_telemetry.json ==="
+            cat surgeon_telemetry.json
+          else
+            echo "surgeon_telemetry.json not found"
+          fi
+
       - name: Fail if output is empty
         run: |
           if [[ ! -s MOJTABA_CLEAN_LIST.txt ]]; then
             echo "::error::MOJTABA_CLEAN_LIST.txt is empty. Surgeon failed to produce configs."
-
-            if [[ -f surgeon_telemetry.json ]]; then
-              echo "=== surgeon_telemetry.json ==="
-              cat surgeon_telemetry.json
-            fi
-
-            if [[ -f network_test_log.txt ]]; then
-              echo "=== network_test_log.txt ==="
-              cat network_test_log.txt
-            else
-              echo "No network logs found."
-            fi
-
             exit 1
           fi
 
@@ -85,6 +84,6 @@ jobs:
           if git diff --cached --quiet; then
             echo "No changes to commit."
           else
-            git commit -m "Update clean configs V7.5"
+            git commit -m "Update clean configs V7.6"
             git push
           fi
