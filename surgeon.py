@@ -1,3 +1,4 @@
+# surgeon.py
 # -*- coding: utf-8 -*-
 
 """
@@ -66,8 +67,8 @@ LIVE_TEST_TCP_ATTEMPTS = int(os.environ.get("LIVE_TEST_TCP_ATTEMPTS", "0"))
 LIVE_TEST_TLS_ATTEMPTS = int(os.environ.get("LIVE_TEST_TLS_ATTEMPTS", "0"))
 LIVE_TEST_ATTEMPT_PAUSE_MS = int(os.environ.get("LIVE_TEST_ATTEMPT_PAUSE_MS", "0"))
 
-FETCH_CONNECT_TIMEOUT os.environ.get("FETCH_CONNECT_TIMEOUT", "12"))
-FETCH_READ_TIMEOUT os.environ.get("FETCH_READ_TIMEOUT", "20"))
+FETCH_CONNECT_TIMEOUT = int(os.environ.get("FETCH_CONNECT_TIMEOUT", "12"))
+FETCH_READ_TIMEOUT = int(os.environ.get("FETCH_READ_TIMEOUT", "20"))
 
 USER_AGENT = f"Mozilla/5.0 (MOJTABA-Surgeon/{VERSION})"
 
@@ -890,9 +891,12 @@ def compute_live_score(
 
 
 def safe_float(value) -> Optional[float]:
-    if isinstance(value, (int, float)):
+    if value is None:
+        return None
+    try:
         return float(value)
-    return None
+    except (TypeError, ValueError):
+        return None
 
 
 def parse_attempt_stats(item: dict) -> Tuple[int, int, int, int]:
@@ -1363,6 +1367,7 @@ def write_telemetry(tel: Telemetry) -> None:
         },
         "naming": {
             "top_1_to": TOP_NAME_COUNT,
+            "middle_from": TOP_NAME_COUNT + 1,
             "middle_6_to": MIDDLE_NAME_UNTIL,
             "top_name": NAME_TOP,
             "middle_name": NAME_MIDDLE,
