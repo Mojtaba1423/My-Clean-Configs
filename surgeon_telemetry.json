@@ -1,217 +1,25 @@
 {
-  "version": "7.5",
-  "started_at": 1780281528.573198,
-  "finished_at": 1780281540.5775573,
-  "duration_sec": 12.004,
-  "started_at_human": "2026-06-01 02:38:48",
-  "finished_at_human": "2026-06-01 02:39:00",
-  "source_count": 18,
-  "source_stats": {
-    "https://raw.githubusercontent.com/mahdibland/ShadowsocksAggregator/master/Eternity.txt": {
-      "url": "https://raw.githubusercontent.com/mahdibland/ShadowsocksAggregator/master/Eternity.txt",
-      "ok": true,
-      "status_code": 200,
-      "error": "",
-      "bytes": 42807,
-      "extracted_links": 0
-    },
-    "https://raw.githubusercontent.com/barry-far/V2ray-Config/refs/heads/main/All_Configs_Sub.txt": {
-      "url": "https://raw.githubusercontent.com/barry-far/V2ray-Config/refs/heads/main/All_Configs_Sub.txt",
-      "ok": true,
-      "status_code": 200,
-      "error": "",
-      "bytes": 857866,
-      "extracted_links": 2676
-    },
-    "https://raw.githubusercontent.com/SoliSpirit/v2ray-configs/refs/heads/main/Protocols/vless.txt": {
-      "url": "https://raw.githubusercontent.com/SoliSpirit/v2ray-configs/refs/heads/main/Protocols/vless.txt",
-      "ok": true,
-      "status_code": 200,
-      "error": "",
-      "bytes": 789825,
-      "extracted_links": 3132
-    },
-    "https://raw.githubusercontent.com/mrvcoder/V2rayCollector/refs/heads/main/vless_iran.txt": {
-      "url": "https://raw.githubusercontent.com/mrvcoder/V2rayCollector/refs/heads/main/vless_iran.txt",
-      "ok": true,
-      "status_code": 200,
-      "error": "",
-      "bytes": 23385,
-      "extracted_links": 81
-    },
-    "https://raw.githubusercontent.com/jafarm83/ConfigV2Ray/refs/heads/main/jafar_ultimate.txt": {
-      "url": "https://raw.githubusercontent.com/jafarm83/ConfigV2Ray/refs/heads/main/jafar_ultimate.txt",
-      "ok": true,
-      "status_code": 200,
-      "error": "",
-      "bytes": 862,
-      "extracted_links": 0
-    },
-    "https://raw.githubusercontent.com/iboxz/free-v2ray-collector/refs/heads/main/main/vless.txt": {
-      "url": "https://raw.githubusercontent.com/iboxz/free-v2ray-collector/refs/heads/main/main/vless.txt",
-      "ok": true,
-      "status_code": 200,
-      "error": "",
-      "bytes": 69442,
-      "extracted_links": 304
-    },
-    "https://raw.githubusercontent.com/mohamadfg-dev/telegram-v2ray-configs-collector/refs/heads/main/category/vless.txt": {
-      "url": "https://raw.githubusercontent.com/mohamadfg-dev/telegram-v2ray-configs-collector/refs/heads/main/category/vless.txt",
-      "ok": true,
-      "status_code": 200,
-      "error": "",
-      "bytes": 69442,
-      "extracted_links": 304
-    },
-    "https://raw.githubusercontent.com/DukeMehdi/FreeList-V2ray-Configs/refs/heads/main/Configs/VLESS-DukeMehdi-Configs.txt": {
-      "url": "https://raw.githubusercontent.com/DukeMehdi/FreeList-V2ray-Configs/refs/heads/main/Configs/VLESS-DukeMehdi-Configs.txt",
-      "ok": true,
-      "status_code": 200,
-      "error": "",
-      "bytes": 19190202,
-      "extracted_links": 76261
-    },
-    "https://raw.githubusercontent.com/V2RAYCONFIGSPOOL/V2RAY_SUB/refs/heads/main/v2ray_configs_no1.txt": {
-      "url": "https://raw.githubusercontent.com/V2RAYCONFIGSPOOL/V2RAY_SUB/refs/heads/main/v2ray_configs_no1.txt",
-      "ok": true,
-      "status_code": 200,
-      "error": "",
-      "bytes": 11026,
-      "extracted_links": 17
-    },
-    "https://raw.githubusercontent.com/V2RAYCONFIGSPOOL/V2RAY_SUB/refs/heads/main/v2ray_configs_no2.txt": {
-      "url": "https://raw.githubusercontent.com/V2RAYCONFIGSPOOL/V2RAY_SUB/refs/heads/main/v2ray_configs_no2.txt",
-      "ok": true,
-      "status_code": 200,
-      "error": "",
-      "bytes": 14174,
-      "extracted_links": 14
-    },
-    "https://raw.githubusercontent.com/V2RAYCONFIGSPOOL/V2RAY_SUB/refs/heads/main/v2ray_configs_no3.txt": {
-      "url": "https://raw.githubusercontent.com/V2RAYCONFIGSPOOL/V2RAY_SUB/refs/heads/main/v2ray_configs_no3.txt",
-      "ok": true,
-      "status_code": 200,
-      "error": "",
-      "bytes": 11786,
-      "extracted_links": 11
-    },
-    "https://raw.githubusercontent.com/V2RAYCONFIGSPOOL/V2RAY_SUB/refs/heads/main/v2ray_configs_no4.txt": {
-      "url": "https://raw.githubusercontent.com/V2RAYCONFIGSPOOL/V2RAY_SUB/refs/heads/main/v2ray_configs_no4.txt",
-      "ok": true,
-      "status_code": 200,
-      "error": "",
-      "bytes": 12275,
-      "extracted_links": 14
-    },
-    "https://raw.githubusercontent.com/V2RAYCONFIGSPOOL/V2RAY_SUB/refs/heads/main/v2ray_configs_no5.txt": {
-      "url": "https://raw.githubusercontent.com/V2RAYCONFIGSPOOL/V2RAY_SUB/refs/heads/main/v2ray_configs_no5.txt",
-      "ok": true,
-      "status_code": 200,
-      "error": "",
-      "bytes": 17787,
-      "extracted_links": 12
-    },
-    "https://raw.githubusercontent.com/V2RAYCONFIGSPOOL/V2RAY_SUB/refs/heads/main/v2ray_configs_no6.txt": {
-      "url": "https://raw.githubusercontent.com/V2RAYCONFIGSPOOL/V2RAY_SUB/refs/heads/main/v2ray_configs_no6.txt",
-      "ok": true,
-      "status_code": 200,
-      "error": "",
-      "bytes": 17357,
-      "extracted_links": 16
-    },
-    "https://raw.githubusercontent.com/V2RAYCONFIGSPOOL/V2RAY_SUB/refs/heads/main/v2ray_configs_no7.txt": {
-      "url": "https://raw.githubusercontent.com/V2RAYCONFIGSPOOL/V2RAY_SUB/refs/heads/main/v2ray_configs_no7.txt",
-      "ok": true,
-      "status_code": 200,
-      "error": "",
-      "bytes": 17552,
-      "extracted_links": 16
-    },
-    "https://raw.githubusercontent.com/V2RAYCONFIGSPOOL/V2RAY_SUB/refs/heads/main/v2ray_configs_no8.txt": {
-      "url": "https://raw.githubusercontent.com/V2RAYCONFIGSPOOL/V2RAY_SUB/refs/heads/main/v2ray_configs_no8.txt",
-      "ok": true,
-      "status_code": 200,
-      "error": "",
-      "bytes": 10670,
-      "extracted_links": 18
-    },
-    "https://raw.githubusercontent.com/V2RAYCONFIGSPOOL/V2RAY_SUB/refs/heads/main/v2ray_configs_no9.txt": {
-      "url": "https://raw.githubusercontent.com/V2RAYCONFIGSPOOL/V2RAY_SUB/refs/heads/main/v2ray_configs_no9.txt",
-      "ok": true,
-      "status_code": 200,
-      "error": "",
-      "bytes": 13449,
-      "extracted_links": 19
-    },
-    "https://raw.githubusercontent.com/V2RAYCONFIGSPOOL/V2RAY_SUB/refs/heads/main/v2ray_configs_no10.txt": {
-      "url": "https://raw.githubusercontent.com/V2RAYCONFIGSPOOL/V2RAY_SUB/refs/heads/main/v2ray_configs_no10.txt",
-      "ok": true,
-      "status_code": 200,
-      "error": "",
-      "bytes": 17477,
-      "extracted_links": 18
-    }
-  },
-  "total_extracted_links": 82913,
-  "total_parsed_links": 82913,
-  "rejects": {
-    "port_not_allowed": 39027,
-    "security_not_reality": 27824,
-    "fp_not_chrome": 5200,
-    "type_not_tcp": 2045,
-    "missing_sni": 77,
-    "bad_uuid": 2554,
-    "private_or_bogon_host_ip": 7,
-    "bad_urlsplit": 159,
-    "missing_at": 86,
-    "bad_encryption": 11,
-    "bad_hostname": 5,
-    "sid_not_hex": 5,
-    "bad_sni": 6,
-    "missing_or_short_pbk": 3,
-    "empty_host": 9,
-    "missing_port": 4,
-    "bad_port": 1
-  },
-  "valid_candidates_before_dedupe": 5890,
-  "deduped_candidates": 4323,
-  "live_probe": {
-    "enabled": true,
-    "binary_exists": true,
-    "invoked": true,
-    "succeeded": true,
-    "failed_reason": "",
-    "tls_supported": true,
-    "total_tested": 4323,
-    "tcp": {
-      "success": 2990,
-      "fail": 1333,
-      "latency": {
-        "min_ms": 2.39,
-        "avg_ms": 152.88,
-        "p50_ms": 139.55,
-        "p90_ms": 200.58,
-        "max_ms": 1194.3
-      }
-    },
-    "tls": {
-      "success": 2731,
-      "fail": 1592,
-      "latency": {
-        "min_ms": 4.85,
-        "avg_ms": 200.89,
-        "p50_ms": 151.45,
-        "p90_ms": 262.38,
-        "max_ms": 1237.66
-      }
-    }
-  },
-  "naming": {
-    "top_1_to": 5,
-    "middle_6_to": 32,
-    "top_name": "🕯️🖤 Mojtaba1423",
-    "middle_name": "🌙⚫ @mojtaba_1423",
-    "rest_name": "🦂🌑 M_1423"
-  },
-  "final_selected": 128
+  "version": "7.7",
+  "sources": [
+    "https://raw.githubusercontent.com/soroushmirzaei/telegram-configs-collector/main/protocols/vless",
+    "https://raw.githubusercontent.com/mahsanet/MahsaFreeConfig/main/sub/sub_merge.txt",
+    "https://raw.githubusercontent.com/peasoft/NoMoreWalls/master/list_raw.txt",
+    "https://raw.githubusercontent.com/aiboboxx/v2rayfree/main/v2",
+    "https://raw.githubusercontent.com/mfuu/v2ray/master/v2ray",
+    "https://raw.githubusercontent.com/ALIILAPRO/v2rayNG-Config/main/sub.txt"
+  ],
+  "fetched_sources": 3,
+  "extracted_uris": 136,
+  "parsed_candidates": 136,
+  "deduped_candidates": 125,
+  "live_results": 125,
+  "selected": 124,
+  "output_file": "MOJTABA_CLEAN_LIST.txt",
+  "errors": [
+    "https://raw.githubusercontent.com/soroushmirzaei/telegram-configs-collector/main/protocols/vless: 404 Client Error: Not Found for url: https://raw.githubusercontent.com/soroushmirzaei/telegram-configs-collector/main/protocols/vless",
+    "https://raw.githubusercontent.com/mahsanet/MahsaFreeConfig/main/sub/sub_merge.txt: 404 Client Error: Not Found for url: https://raw.githubusercontent.com/mahsanet/MahsaFreeConfig/main/sub/sub_merge.txt",
+    "https://raw.githubusercontent.com/aiboboxx/v2rayfree/main/v2: 404 Client Error: Not Found for url: https://raw.githubusercontent.com/aiboboxx/v2rayfree/main/v2"
+  ],
+  "duration_sec": 8.552,
+  "output_nonempty": true
 }
