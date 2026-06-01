@@ -47,6 +47,8 @@ jobs:
           LIVE_TEST_TIMEOUT_MS: "2500"
           LIVE_TEST_PROCESS_TIMEOUT_SEC: "180"
           LIVE_TEST_ATTEMPTS: "2"
+          LIVE_TEST_TCP_ATTEMPTS: "2"
+          LIVE_TEST_TLS_ATTEMPTS: "2"
           LIVE_TEST_ATTEMPT_PAUSE_MS: "150"
           MAX_OUTPUT: "128"
           MAX_PER_HOST: "2"
