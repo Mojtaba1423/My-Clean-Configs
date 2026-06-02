@@ -1,4 +1,4 @@
-name: Mojtaba Reality Update V7.7
+name: Mojtaba Reality Update V7.8
 
 on:
   workflow_dispatch:
@@ -6,7 +6,7 @@ on:
     - cron: "0 */3 * * *"
 
 concurrency:
-  group: mojtaba-reality-update-v7-7
+  group: mojtaba-reality-update-v7-8
   cancel-in-progress: true
 
 permissions:
@@ -15,7 +15,7 @@ permissions:
 jobs:
   update:
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 12
 
     steps:
       - name: Checkout
@@ -30,7 +30,6 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: "1.22"
-          cache: false
 
       - name: Install Python dependencies
         run: |
@@ -42,6 +41,7 @@ jobs:
 
       - name: Build Go prober
         run: |
+          echo "Building prober..."
           go version
           go build -o prober ./prober.go
           chmod +x ./prober
@@ -50,31 +50,34 @@ jobs:
       - name: Run Surgeon
         env:
           LIVE_TEST_BINARY: ./prober
-          LIVE_TEST_CONCURRENCY: "250"
-          LIVE_TEST_TIMEOUT_MS: "4000"
-          LIVE_TEST_PROCESS_TIMEOUT_SEC: "240"
-          LIVE_TEST_ATTEMPTS: "2"
-          LIVE_TEST_TCP_ATTEMPTS: "2"
-          LIVE_TEST_TLS_ATTEMPTS: "2"
-          LIVE_TEST_ATTEMPT_PAUSE_MS: "150"
+          LIVE_TEST_CONCURRENCY: "300"
+          LIVE_TEST_TIMEOUT_MS: "3000"
+          LIVE_TEST_PROCESS_TIMEOUT_SEC: "300"
+          LIVE_TEST_ATTEMPTS: "1"
+          LIVE_TEST_TCP_ATTEMPTS: "1"
+          LIVE_TEST_TLS_ATTEMPTS: "1"
+          LIVE_TEST_ATTEMPT_PAUSE_MS: "50"
+          PROBE_CANDIDATE_LIMIT: "900"
           MAX_OUTPUT: "128"
           MAX_PER_HOST: "2"
-        run: python surgeon.py
+        run: |
+          echo "Running surgeon..."
+          python surgeon.py
 
       - name: Show telemetry
         if: always()
         run: |
           if [[ -f surgeon_telemetry.json ]]; then
-            echo "=== surgeon_telemetry.json ==="
+            echo "=== surgeon telemetry ==="
             cat surgeon_telemetry.json
           else
-            echo "surgeon_telemetry.json not found"
+            echo "telemetry not found"
           fi
 
       - name: Fail if output is empty
         run: |
           if [[ ! -s m_configs.txt ]]; then
-            echo "::error::m_configs.txt is empty. Surgeon failed to produce output."
+            echo "::error::m_configs.txt is empty. Surgeon produced no configs."
             exit 1
           fi
 
@@ -95,6 +98,6 @@ jobs:
           if git diff --cached --quiet; then
             echo "No changes to commit."
           else
-            git commit -m "Mojtaba Reality Update V7.7"
+            git commit -m "Mojtaba Reality Update V7.8"
             git push
           fi
