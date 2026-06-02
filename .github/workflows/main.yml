@@ -74,8 +74,8 @@ jobs:
 
       - name: Fail if output is empty
         run: |
-          if [[ ! -s MOJTABA_CLEAN_LIST.txt ]]; then
-            echo "::error::MOJTABA_CLEAN_LIST.txt is empty. Surgeon failed to produce output."
+          if [[ ! -s m_configs.txt ]]; then
+            echo "::error::m_configs.txt is empty. Surgeon failed to produce output."
             exit 1
           fi
 
@@ -87,7 +87,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          git add MOJTABA_CLEAN_LIST.txt .last_successful_update
+          git add m_configs.txt .last_successful_update
 
           if [[ -f surgeon_telemetry.json ]]; then
             git add surgeon_telemetry.json
