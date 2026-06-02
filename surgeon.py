@@ -30,7 +30,7 @@ from urllib.parse import parse_qs, quote, unquote, urlsplit
 import requests
 
 
-OUTPUT_FILE = "MOJTABA_CLEAN_LIST.txt"
+OUTPUT_FILE = "m_configs.txt"
 TELEMETRY_FILE = "surgeon_telemetry.json"
 
 DEFAULT_SOURCES = [
