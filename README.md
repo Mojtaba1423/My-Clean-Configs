@@ -29,7 +29,7 @@
 <div dir="ltr">
 ```https
   
-https://raw.githubusercontent.com/Mojtaba1423/My-Clean-Configs/main/MOJTABA_CLEAN_LIST.txt
+https://raw.githubusercontent.com/Mojtaba1423/My-Clean-Configs/main/m_configs.txt
 </div>
 
 <div dir="rtl">
@@ -147,7 +147,7 @@ https://raw.githubusercontent.com/Mojtaba1423/My-Clean-Configs/main/MOJTABA_CLEA
   <li>بهینه‌سازی لیست نهایی برای usable بودن بیشتر و نویز کمتر.</li>
   <li>جلوگیری از تکرار بیش از حد کانفیگ‌های وابسته به یک میزبان.</li>
   <li>تثبیت بروزرسانی منظم هر ۳ ساعت.</li>
-  <li>تمرکز خروجی روی فایل نهایی <code>MOJTABA_CLEAN_LIST.txt</code>.</li>
+  <li>تمرکز خروجی روی فایل نهایی <code>m_configs.txt</code>.</li>
   <li>رفع باگ 😄</li>
 </ul>
 </details>
