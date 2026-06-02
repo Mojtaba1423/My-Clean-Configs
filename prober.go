@@ -46,6 +46,10 @@ type ProbeResult struct {
 	TLSError  string `json:"tls_error,omitempty"`
 }
 
+var (
+	tlsCache = tls.NewLRUClientSessionCache(2048)
+)
+
 func clampConcurrency(n int) int {
 	if n <= 0 {
 		return 100
@@ -111,6 +115,10 @@ func readRequest() (ProbeRequest, error) {
 		req.TLSAttempts = req.Attempts
 	}
 
+	if req.Concurrency > len(req.Targets) {
+		req.Concurrency = len(req.Targets)
+	}
+
 	return req, nil
 }
 
@@ -122,10 +130,7 @@ func writeResponse(resp ProbeResponse) {
 
 func writeFatal(err error) {
 	fmt.Fprintln(os.Stderr, "fatal:", err)
-	resp := ProbeResponse{
-		Results: []ProbeResult{},
-	}
-	writeResponse(resp)
+	writeResponse(ProbeResponse{Results: []ProbeResult{}})
 }
 
 func firstNonEmpty(parts ...string) string {
@@ -139,6 +144,7 @@ func firstNonEmpty(parts ...string) string {
 }
 
 func singleAttempt(target ProbeTarget, timeout time.Duration, doTLS bool) ProbeResult {
+
 	result := ProbeResult{
 		ID:   target.ID,
 		Host: target.Host,
@@ -151,50 +157,61 @@ func singleAttempt(target ProbeTarget, timeout time.Duration, doTLS bool) ProbeR
 		result.Error = "empty_host"
 		return result
 	}
+
 	if target.Port <= 0 || target.Port > 65535 {
 		result.Error = "invalid_port"
 		return result
 	}
 
-	sni := firstNonEmpty(target.SNI, target.Host)
 	address := net.JoinHostPort(host, fmt.Sprintf("%d", target.Port))
+	sni := firstNonEmpty(target.SNI, target.Host)
 
 	start := time.Now()
-	conn, err := net.DialTimeout("tcp", address, timeout)
+
+	dialer := net.Dialer{
+		Timeout:   timeout,
+		KeepAlive: timeout,
+	}
+
+	conn, err := dialer.Dial("tcp", address)
 	if err != nil {
 		result.Error = err.Error()
 		return result
 	}
+
 	result.TCPOk = true
 
 	if !doTLS {
 		result.LatencyMS = time.Since(start).Milliseconds()
-		_ = conn.Close()
+		conn.Close()
 		return result
 	}
 
-	tlsConfig := &tls.Config{
+	conn.SetDeadline(time.Now().Add(timeout))
+
+	tlsConn := tls.Client(conn, &tls.Config{
 		ServerName:         sni,
 		InsecureSkipVerify: true,
 		MinVersion:         tls.VersionTLS12,
-	}
+		ClientSessionCache: tlsCache,
+	})
 
-	tlsConn := tls.Client(conn, tlsConfig)
-	_ = tlsConn.SetDeadline(time.Now().Add(timeout))
 	if err := tlsConn.Handshake(); err != nil {
 		result.TLSError = err.Error()
-		_ = tlsConn.Close()
-		result.LatencyMS = time.Since(start).Milliseconds()
+		tlsConn.Close()
 		return result
 	}
 
 	result.TLSOk = true
 	result.LatencyMS = time.Since(start).Milliseconds()
-	_ = tlsConn.Close()
+
+	tlsConn.Close()
+
 	return result
 }
 
 func betterResult(a, b ProbeResult) ProbeResult {
+
 	score := func(r ProbeResult) int {
 		s := 0
 		if r.TCPOk {
@@ -202,12 +219,6 @@ func betterResult(a, b ProbeResult) ProbeResult {
 		}
 		if r.TLSOk {
 			s += 10
-		}
-		if r.Error == "" {
-			s += 1
-		}
-		if r.TLSError == "" {
-			s += 1
 		}
 		if r.LatencyMS > 0 && r.LatencyMS < 400 {
 			s += 2
@@ -218,6 +229,7 @@ func betterResult(a, b ProbeResult) ProbeResult {
 	if score(b) > score(a) {
 		return b
 	}
+
 	if score(b) == score(a) {
 		if a.LatencyMS == 0 {
 			return b
@@ -226,74 +238,67 @@ func betterResult(a, b ProbeResult) ProbeResult {
 			return b
 		}
 	}
+
 	return a
 }
 
 func probeTarget(req ProbeRequest, target ProbeTarget) ProbeResult {
-	result := ProbeResult{
-		ID:   target.ID,
-		Host: target.Host,
-		Port: target.Port,
-		SNI:  firstNonEmpty(target.SNI, target.Host),
-	}
-
-	host := strings.TrimSpace(target.Host)
-	if host == "" {
-		result.Error = "empty_host"
-		return result
-	}
-	if target.Port <= 0 || target.Port > 65535 {
-		result.Error = "invalid_port"
-		return result
-	}
 
 	timeout := time.Duration(req.TimeoutMS) * time.Millisecond
 	pause := time.Duration(req.AttemptPauseMS) * time.Millisecond
 
-	bestTCP := ProbeResult{
+	best := ProbeResult{
 		ID:   target.ID,
 		Host: target.Host,
 		Port: target.Port,
 		SNI:  firstNonEmpty(target.SNI, target.Host),
 	}
+
 	for i := 0; i < req.TCPAttempts; i++ {
+
 		r := singleAttempt(target, timeout, false)
-		bestTCP = betterResult(bestTCP, r)
+		best = betterResult(best, r)
+
 		if r.TCPOk {
 			break
 		}
+
 		if pause > 0 && i+1 < req.TCPAttempts {
 			time.Sleep(pause)
 		}
 	}
 
-	if !bestTCP.TCPOk {
-		return bestTCP
+	if !best.TCPOk {
+		return best
 	}
 
-	bestTLS := bestTCP
 	for i := 0; i < req.TLSAttempts; i++ {
+
 		r := singleAttempt(target, timeout, true)
-		bestTLS = betterResult(bestTLS, r)
+		best = betterResult(best, r)
+
 		if r.TLSOk {
 			break
 		}
+
 		if pause > 0 && i+1 < req.TLSAttempts {
 			time.Sleep(pause)
 		}
 	}
 
-	return bestTLS
+	return best
 }
 
 func worker(req ProbeRequest, jobs <-chan ProbeTarget, results chan<- ProbeResult, wg *sync.WaitGroup) {
 	defer wg.Done()
-	for target := range jobs {
-		results <- probeTarget(req, target)
+
+	for t := range jobs {
+		results <- probeTarget(req, t)
 	}
 }
 
 func main() {
+
 	req, err := readRequest()
 	if err != nil {
 		writeFatal(err)
@@ -305,10 +310,11 @@ func main() {
 		return
 	}
 
-	jobs := make(chan ProbeTarget)
+	jobs := make(chan ProbeTarget, req.Concurrency*4)
 	results := make(chan ProbeResult, len(req.Targets))
 
 	var wg sync.WaitGroup
+
 	for i := 0; i < req.Concurrency; i++ {
 		wg.Add(1)
 		go worker(req, jobs, results, &wg)
@@ -326,6 +332,7 @@ func main() {
 	out := ProbeResponse{
 		Results: make([]ProbeResult, 0, len(req.Targets)),
 	}
+
 	for r := range results {
 		out.Results = append(out.Results, r)
 	}
