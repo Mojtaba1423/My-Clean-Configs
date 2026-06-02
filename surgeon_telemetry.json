@@ -1,5 +1,5 @@
 {
-  "version": "7.7",
+  "version": "7.8",
   "sources": [
     "https://raw.githubusercontent.com/peasoft/NoMoreWalls/master/list_raw.txt",
     "https://raw.githubusercontent.com/ALIILAPRO/v2rayNG-Config/main/sub.txt",
@@ -23,13 +23,15 @@
     "https://raw.githubusercontent.com/V2RAYCONFIGSPOOL/V2RAY_SUB/refs/heads/main/v2ray_configs_no10.txt"
   ],
   "fetched_sources": 20,
-  "extracted_uris": 88285,
-  "parsed_candidates": 88175,
-  "deduped_candidates": 36467,
-  "live_results": 0,
+  "extracted_uris": 87966,
+  "parsed_candidates": 43070,
+  "deduped_candidates": 18480,
+  "probe_limit": 900,
+  "probe_input": 900,
+  "live_results": 900,
   "selected": 128,
   "output_file": "m_configs.txt",
   "errors": [],
-  "duration_sec": 245.166,
+  "duration_sec": 11.927,
   "output_nonempty": true
 }
