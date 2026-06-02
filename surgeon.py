@@ -2,10 +2,10 @@
 # -*- coding: utf-8 -*-
 
 """
-MOJTABA Surgeon V7.7
+MOJTABA Surgeon V7.8
 - Strong extraction from mixed/base64-wrapped sources
-- Conservative VLESS parsing with normalization
-- Offline scoring + optional live probing
+- Strict VLESS parsing with normalization
+- Offline scoring + capped live probing
 - Per-host diversity limit
 - Telemetry for debugging in GitHub Actions
 """
@@ -14,12 +14,11 @@ from __future__ import annotations
 
 import base64
 import binascii
+import ipaddress
 import json
 import os
 import random
 import re
-import socket
-import string
 import subprocess
 import sys
 import time
@@ -65,15 +64,16 @@ USER_AGENTS = [
 REQUEST_TIMEOUT = 20
 MAX_OUTPUT = int(os.getenv("MAX_OUTPUT", "128"))
 MAX_PER_HOST = int(os.getenv("MAX_PER_HOST", "2"))
+PROBE_CANDIDATE_LIMIT = int(os.getenv("PROBE_CANDIDATE_LIMIT", "900"))
 
 LIVE_TEST_BINARY = os.getenv("LIVE_TEST_BINARY", "./prober")
 LIVE_TEST_CONCURRENCY = int(os.getenv("LIVE_TEST_CONCURRENCY", "250"))
-LIVE_TEST_TIMEOUT_MS = int(os.getenv("LIVE_TEST_TIMEOUT_MS", "4000"))
-LIVE_TEST_PROCESS_TIMEOUT_SEC = int(os.getenv("LIVE_TEST_PROCESS_TIMEOUT_SEC", "240"))
-LIVE_TEST_ATTEMPTS = int(os.getenv("LIVE_TEST_ATTEMPTS", "2"))
-LIVE_TEST_TCP_ATTEMPTS = int(os.getenv("LIVE_TEST_TCP_ATTEMPTS", "2"))
-LIVE_TEST_TLS_ATTEMPTS = int(os.getenv("LIVE_TEST_TLS_ATTEMPTS", "2"))
-LIVE_TEST_ATTEMPT_PAUSE_MS = int(os.getenv("LIVE_TEST_ATTEMPT_PAUSE_MS", "150"))
+LIVE_TEST_TIMEOUT_MS = int(os.getenv("LIVE_TEST_TIMEOUT_MS", "2500"))
+LIVE_TEST_PROCESS_TIMEOUT_SEC = int(os.getenv("LIVE_TEST_PROCESS_TIMEOUT_SEC", "480"))
+LIVE_TEST_ATTEMPTS = int(os.getenv("LIVE_TEST_ATTEMPTS", "1"))
+LIVE_TEST_TCP_ATTEMPTS = int(os.getenv("LIVE_TEST_TCP_ATTEMPTS", "1"))
+LIVE_TEST_TLS_ATTEMPTS = int(os.getenv("LIVE_TEST_TLS_ATTEMPTS", "1"))
+LIVE_TEST_ATTEMPT_PAUSE_MS = int(os.getenv("LIVE_TEST_ATTEMPT_PAUSE_MS", "50"))
 
 TOP_NAME_COUNT = int(os.environ.get("TOP_NAME_COUNT", "5"))
 MIDDLE_NAME_UNTIL = int(os.environ.get("MIDDLE_NAME_UNTIL", "32"))
@@ -81,6 +81,29 @@ MIDDLE_NAME_UNTIL = int(os.environ.get("MIDDLE_NAME_UNTIL", "32"))
 NAME_TOP = "🕯️🖤 Mojtaba1423"
 NAME_MIDDLE = "🌙⚫ @mojtaba_1423"
 NAME_REST = "🦂🌑 M_1423"
+
+ALLOWED_TRANSPORTS = {"tcp", "ws", "grpc", "httpupgrade", "splithttp"}
+TLS_PORTS = {443, 8443, 2053, 2083, 2087, 2096}
+DISCOURAGED_PORTS = {80, 8080, 8880, 2052, 2082, 2086, 2095}
+BAD_HOST_FRAGMENTS = {
+    "localhost",
+    "127.0.0.1",
+    "0.0.0.0",
+    "example.com",
+    "test",
+    "yourdomain",
+    "your-domain",
+    "worker.dev",
+}
+BAD_REMARK_FRAGMENTS = {
+    "telegram",
+    "join",
+    "subscribe",
+    "free",
+    "trial",
+    "channel",
+    "group",
+}
 
 
 @dataclass
@@ -113,15 +136,20 @@ class Candidate:
     latency_ms: int = 999999
     error: str = ""
 
-    def key(self) -> Tuple[str, int, str, str, str, str]:
+    def key(self) -> Tuple[str, int, str, str, str, str, str, str]:
         return (
             self.host.lower(),
             self.port,
             (self.sni or "").lower(),
+            (self.security or "").lower(),
+            (self.type_ or "").lower(),
             (self.path or "/"),
+            (self.service_name or ""),
             (self.pbk or ""),
-            (self.sid or ""),
         )
+
+    def endpoint_key(self) -> Tuple[str, int]:
+        return (self.host.lower(), self.port)
 
     def to_uri(self) -> str:
         q = dict(self.query)
@@ -148,14 +176,18 @@ class Candidate:
             q["alpn"] = self.alpn
 
         parts = []
-        for k, v in q.items():
-            if v is None:
+        for k in sorted(q.keys()):
+            v = q.get(k)
+            if v is None or v == "":
                 continue
             parts.append(f"{k}={v}")
-        query = "&".join(parts)
 
+        query = "&".join(parts)
         fragment = quote(self.remark or "MOJTABA", safe="")
-        return f"vless://{self.uuid}@{self.host}:{self.port}?{query}#{fragment}"
+
+        if query:
+            return f"vless://{self.uuid}@{self.host}:{self.port}?{query}#{fragment}"
+        return f"vless://{self.uuid}@{self.host}:{self.port}#{fragment}"
 
 
 def log(msg: str) -> None:
@@ -229,7 +261,11 @@ def extract_candidate_uris(text: str) -> List[str]:
     for layer in maybe_decode_base64_layers(text, max_layers=3):
         for m in pattern.findall(layer):
             u = m.strip()
-            if u and u not in seen:
+            if not u:
+                continue
+            if len(u) < 32:
+                continue
+            if u not in seen:
                 seen.add(u)
                 results.append(u)
 
@@ -237,7 +273,74 @@ def extract_candidate_uris(text: str) -> List[str]:
 
 
 def normalize_host(host: str) -> str:
-    return host.strip().strip("[]").lower()
+    host = host.strip().strip("[]").strip().lower().rstrip(".")
+    return host
+
+
+def is_ipv4(host: str) -> bool:
+    try:
+        ip = ipaddress.ip_address(host)
+        return ip.version == 4
+    except ValueError:
+        return False
+
+
+def is_valid_domain(host: str) -> bool:
+    if len(host) < 4 or len(host) > 253:
+        return False
+    if "." not in host:
+        return False
+    if host.startswith(".") or host.endswith("."):
+        return False
+    if ".." in host:
+        return False
+    if not re.fullmatch(r"[a-z0-9.-]+", host):
+        return False
+
+    labels = host.split(".")
+    for label in labels:
+        if not label or len(label) > 63:
+            return False
+        if label.startswith("-") or label.endswith("-"):
+            return False
+
+    tld = labels[-1]
+    if len(tld) < 2:
+        return False
+
+    return True
+
+
+def looks_like_uuid(value: str) -> bool:
+    return bool(
+        re.fullmatch(
+            r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}",
+            value.strip(),
+        )
+    )
+
+
+def is_bad_host(host: str) -> bool:
+    h = host.lower()
+    if any(x in h for x in BAD_HOST_FRAGMENTS):
+        return True
+    if h.startswith("192.168.") or h.startswith("10.") or h.startswith("172.16."):
+        return True
+    return False
+
+
+def normalize_path(path: str) -> str:
+    p = unquote((path or "/").strip() or "/")
+    if not p.startswith("/"):
+        p = "/" + p
+    if len(p) > 256:
+        p = p[:256]
+    return p
+
+
+def normalize_query_map(parts_query: str) -> Dict[str, str]:
+    query_map_raw = parse_qs(parts_query, keep_blank_values=True)
+    return {k: (v[-1].strip() if v else "") for k, v in query_map_raw.items()}
 
 
 def parse_vless_candidate(uri: str) -> Optional[Candidate]:
@@ -252,17 +355,28 @@ def parse_vless_candidate(uri: str) -> Optional[Candidate]:
     if not parts.netloc or "@" not in parts.netloc:
         return None
 
-    userinfo, hostport = parts.netloc.rsplit("@", 1)
+    try:
+        userinfo, hostport = parts.netloc.rsplit("@", 1)
+    except ValueError:
+        return None
+
     uuid = userinfo.strip()
-    if not uuid:
+    if not looks_like_uuid(uuid):
         return None
 
     if ":" not in hostport:
         return None
 
-    host, port_str = hostport.rsplit(":", 1)
+    try:
+        host, port_str = hostport.rsplit(":", 1)
+    except ValueError:
+        return None
+
     host = normalize_host(host)
-    if not host:
+    if not host or len(host) < 4 or is_bad_host(host):
+        return None
+
+    if not (is_ipv4(host) or is_valid_domain(host)):
         return None
 
     try:
@@ -273,20 +387,49 @@ def parse_vless_candidate(uri: str) -> Optional[Candidate]:
     if port <= 0 or port > 65535:
         return None
 
-    query_map_raw = parse_qs(parts.query, keep_blank_values=True)
-    query = {k: (v[-1] if v else "") for k, v in query_map_raw.items()}
+    query = normalize_query_map(parts.query)
 
     security = (query.get("security") or "").strip().lower()
-    transport = (query.get("type") or "").strip().lower()
-    path = unquote((query.get("path") or "/").strip() or "/")
-    sni = (query.get("sni") or query.get("serverName") or "").strip().lower()
+    transport = (query.get("type") or "tcp").strip().lower()
+    path = normalize_path(query.get("path") or "/")
+    sni = normalize_host((query.get("sni") or query.get("serverName") or "").strip())
     service_name = (query.get("serviceName") or "").strip()
     pbk = (query.get("pbk") or query.get("publicKey") or "").strip()
     sid = (query.get("sid") or query.get("shortId") or "").strip()
-    fp = (query.get("fp") or query.get("fingerprint") or "").strip()
+    fp = (query.get("fp") or query.get("fingerprint") or "").strip().lower()
     flow = (query.get("flow") or "").strip()
     alpn = (query.get("alpn") or "").strip()
     remark = unquote((parts.fragment or "").strip())
+
+    if transport not in ALLOWED_TRANSPORTS:
+        return None
+
+    if security not in {"", "tls", "xtls", "reality"}:
+        return None
+
+    if security == "reality":
+        if not pbk or len(pbk) < 8:
+            return None
+        if not sni:
+            return None
+
+    if security in {"tls", "xtls"} and not sni:
+        return None
+
+    if transport == "ws" and path == "/":
+        return None
+
+    if transport == "grpc" and not service_name:
+        return None
+
+    if port in DISCOURAGED_PORTS and security in {"", "tls", "xtls"}:
+        return None
+
+    if security in {"tls", "xtls", "reality"} and port not in TLS_PORTS and port < 1024:
+        return None
+
+    if sni and not (is_ipv4(sni) or is_valid_domain(sni)):
+        return None
 
     c = Candidate(
         raw=uri.strip(),
@@ -294,7 +437,7 @@ def parse_vless_candidate(uri: str) -> Optional[Candidate]:
         uuid=uuid,
         host=host,
         port=port,
-        path=path if path.startswith("/") else f"/{path}",
+        path=path,
         sni=sni or host,
         security=security,
         transport=transport,
@@ -315,66 +458,97 @@ def parse_vless_candidate(uri: str) -> Optional[Candidate]:
 def score_candidate(c: Candidate) -> int:
     score = 0
 
-    if c.scheme == "vless":
-        score += 20
+    score += 25
 
     if c.security == "reality":
-        score += 40
-    elif c.security in ("tls", "xtls"):
-        score += 15
+        score += 45
+    elif c.security in {"tls", "xtls"}:
+        score += 22
+    else:
+        score -= 20
 
-    if c.type_ in ("tcp", "ws", "grpc"):
+    if c.type_ == "grpc":
+        score += 16
+    elif c.type_ == "ws":
+        score += 14
+    elif c.type_ == "tcp":
         score += 10
-
-    if c.type_ == "tcp":
-        score += 5
-
-    if c.sni:
+    elif c.type_ in {"httpupgrade", "splithttp"}:
         score += 8
+
+    if c.sni and c.sni != c.host:
+        score += 8
+    elif c.sni:
+        score += 5
 
     if c.pbk:
         score += 12
-
     if c.sid:
         score += 6
-
     if c.fp:
         score += 4
+    if c.flow:
+        score += 2
+    if c.alpn:
+        score += 2
 
     if c.path and c.path != "/":
-        score += 3
+        score += 4
 
     if c.service_name:
-        score += 3
+        score += 5
 
-    if c.port in (443, 8443, 2053, 2083, 2087, 2096):
-        score += 8
+    if c.port in TLS_PORTS:
+        score += 12
+    elif c.port in DISCOURAGED_PORTS:
+        score -= 15
     elif 1 <= c.port <= 65535:
         score += 2
 
-    host = c.host.lower()
-    if re.fullmatch(r"\d+\.\d+\.\d+\.\d+", host):
-        score -= 2
+    if is_ipv4(c.host):
+        score -= 4
     else:
-        score += 4
+        score += 6
 
-    if len(host) >= 4:
-        score += 2
+    if c.host.endswith(".workers.dev") or c.host.endswith(".pages.dev"):
+        score -= 12
 
     if c.remark:
         score += 1
+        rr = c.remark.lower()
+        if any(x in rr for x in BAD_REMARK_FRAGMENTS):
+            score -= 2
+
+    if len(c.host) >= 8:
+        score += 2
 
     return score
 
 
 def dedupe_candidates(cands: Iterable[Candidate]) -> List[Candidate]:
-    best: Dict[Tuple[str, int, str, str, str, str], Candidate] = {}
-    for c in cands:
+    best: Dict[Tuple[str, int, str, str, str, str, str, str], Candidate] = {}
+    endpoint_counts: Dict[Tuple[str, int], int] = {}
+
+    ordered = sorted(cands, key=lambda x: (x.offline_score, len(x.raw)), reverse=True)
+
+    for c in ordered:
         k = c.key()
         prev = best.get(k)
         if prev is None or c.offline_score > prev.offline_score:
             best[k] = c
-    return list(best.values())
+
+    deduped = list(best.values())
+
+    final_list: List[Candidate] = []
+    for c in sorted(deduped, key=lambda x: x.offline_score, reverse=True):
+        ek = c.endpoint_key()
+        cnt = endpoint_counts.get(ek, 0)
+        if cnt >= 4:
+            continue
+        endpoint_counts[ek] = cnt + 1
+        final_list.append(c)
+
+    return final_list
 
 
 def build_probe_payload(cands: List[Candidate]) -> Dict:
@@ -390,7 +564,7 @@ def build_probe_payload(cands: List[Candidate]) -> Dict:
         )
 
     return {
-        "version": "7.7",
+        "version": "7.8",
         "mode": "tls",
         "concurrency": LIVE_TEST_CONCURRENCY,
         "timeout_ms": LIVE_TEST_TIMEOUT_MS,
@@ -457,7 +631,12 @@ def apply_live_results(cands: List[Candidate], result_map: Dict[str, Dict]) -> N
 
         c.tcp_ok = bool(item.get("tcp_ok", False))
         c.tls_ok = bool(item.get("tls_ok", False))
-        c.latency_ms = int(item.get("latency_ms", 999999) or 999999)
+
+        latency = item.get("latency_ms", item.get("tls_latency_ms", 999999))
+        try:
+            c.latency_ms = int(latency or 999999)
+        except Exception:
+            c.latency_ms = 999999
 
         err = str(item.get("error", "") or "").strip()
         tls_err = str(item.get("tls_error", "") or "").strip()
@@ -467,14 +646,17 @@ def apply_live_results(cands: List[Candidate], result_map: Dict[str, Dict]) -> N
         if c.tcp_ok:
             live += 20
         if c.tls_ok:
-            live += 45
+            live += 55
 
         if c.latency_ms < 150:
-            live += 20
-        elif c.latency_ms < 400:
-            live += 12
-        elif c.latency_ms < 900:
-            live += 5
+            live += 22
+        elif c.latency_ms < 350:
+            live += 14
+        elif c.latency_ms < 700:
+            live += 7
+
+        if c.tls_ok and c.security in {"tls", "xtls", "reality"}:
+            live += 8
 
         c.live_score = live
         c.total_score = c.offline_score + c.live_score
@@ -505,9 +687,9 @@ def select_best(cands: List[Candidate], max_output: int, max_per_host: int) -> L
         key=lambda x: (
             x.total_score,
             x.live_score,
-            x.offline_score,
             x.tls_ok,
             x.tcp_ok,
+            x.offline_score,
             -x.latency_ms,
         ),
         reverse=True,
@@ -519,13 +701,18 @@ def select_best(cands: List[Candidate], max_output: int, max_per_host: int) -> L
     for c in ordered:
         if len(selected) >= max_output:
             break
+
         cnt = host_counts.get(c.host, 0)
         if cnt >= max_per_host:
             continue
+
         selected.append(c)
         host_counts[c.host] = cnt + 1
 
-    return selected
+    if selected:
+        return selected
+
+    return ordered[:max_output]
 
 
 def write_output(cands: List[Candidate], path: str) -> None:
@@ -544,12 +731,14 @@ def write_telemetry(data: Dict) -> None:
 def main() -> int:
     started = time.time()
     telemetry = {
-        "version": "7.7",
+        "version": "7.8",
         "sources": [],
         "fetched_sources": 0,
         "extracted_uris": 0,
         "parsed_candidates": 0,
         "deduped_candidates": 0,
+        "probe_limit": PROBE_CANDIDATE_LIMIT,
+        "probe_input": 0,
         "live_results": 0,
         "selected": 0,
         "output_file": OUTPUT_FILE,
@@ -592,14 +781,24 @@ def main() -> int:
     telemetry["deduped_candidates"] = len(deduped)
     log(f"[dedupe] deduped={len(deduped)}")
 
-    live_results = run_live_probe(deduped)
+    deduped_sorted = sorted(
+        deduped,
+        key=lambda x: (x.offline_score, len(x.host), len(x.path or "")),
+        reverse=True,
+    )
+
+    probe_candidates = deduped_sorted[:PROBE_CANDIDATE_LIMIT]
+    telemetry["probe_input"] = len(probe_candidates)
+    log(f"[probe] probing {len(probe_candidates)} of {len(deduped_sorted)} candidates")
+
+    live_results = run_live_probe(probe_candidates)
     telemetry["live_results"] = len(live_results)
     log(f"[probe] results={len(live_results)}")
 
-    apply_live_results(deduped, live_results)
-    finalize_scores(deduped)
+    apply_live_results(probe_candidates, live_results)
+    finalize_scores(deduped_sorted)
 
-    selected = select_best(deduped, MAX_OUTPUT, MAX_PER_HOST)
+    selected = select_best(deduped_sorted, MAX_OUTPUT, MAX_PER_HOST)
     telemetry["selected"] = len(selected)
     log(f"[select] selected={len(selected)}")
 
