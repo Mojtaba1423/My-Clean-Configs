@@ -23,13 +23,13 @@
     "https://raw.githubusercontent.com/V2RAYCONFIGSPOOL/V2RAY_SUB/refs/heads/main/v2ray_configs_no10.txt"
   ],
   "fetched_sources": 20,
-  "extracted_uris": 85755,
-  "parsed_candidates": 85647,
-  "deduped_candidates": 35949,
+  "extracted_uris": 86470,
+  "parsed_candidates": 86362,
+  "deduped_candidates": 36112,
   "live_results": 0,
   "selected": 128,
   "output_file": "MOJTABA_CLEAN_LIST.txt",
   "errors": [],
-  "duration_sec": 245.788,
+  "duration_sec": 247.323,
   "output_nonempty": true
 }
