@@ -23,15 +23,15 @@
     "https://raw.githubusercontent.com/V2RAYCONFIGSPOOL/V2RAY_SUB/refs/heads/main/v2ray_configs_no10.txt"
   ],
   "fetched_sources": 20,
-  "extracted_uris": 185043,
-  "parsed_candidates": 99513,
-  "deduped_candidates": 29798,
+  "extracted_uris": 185898,
+  "parsed_candidates": 100099,
+  "deduped_candidates": 29903,
   "probe_limit": 900,
   "probe_input": 900,
   "live_results": 900,
   "selected": 128,
   "output_file": "m_configs.txt",
   "errors": [],
-  "duration_sec": 20.509,
+  "duration_sec": 22.273,
   "output_nonempty": true
 }
