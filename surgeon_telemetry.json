@@ -22,16 +22,18 @@
     "https://raw.githubusercontent.com/V2RAYCONFIGSPOOL/V2RAY_SUB/refs/heads/main/v2ray_configs_no9.txt",
     "https://raw.githubusercontent.com/V2RAYCONFIGSPOOL/V2RAY_SUB/refs/heads/main/v2ray_configs_no10.txt"
   ],
-  "fetched_sources": 20,
-  "extracted_uris": 202669,
-  "parsed_candidates": 84626,
-  "deduped_candidates": 43624,
+  "fetched_sources": 19,
+  "extracted_uris": 202923,
+  "parsed_candidates": 84824,
+  "deduped_candidates": 43749,
   "probe_limit": 900,
   "probe_input": 900,
   "live_results": 900,
   "selected": 128,
   "output_file": "m_configs.txt",
-  "errors": [],
-  "duration_sec": 19.853,
+  "errors": [
+    "https://raw.githubusercontent.com/V2RAYCONFIGSPOOL/V2RAY_SUB/refs/heads/main/v2ray_configs_no2.txt: ('Connection aborted.', ConnectionResetError(104, 'Connection reset by peer'))"
+  ],
+  "duration_sec": 17.756,
   "output_nonempty": true
 }
