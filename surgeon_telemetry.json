@@ -24,14 +24,14 @@
   ],
   "fetched_sources": 20,
   "extracted_uris": 33991,
-  "parsed_candidates": 16463,
-  "deduped_candidates": 8561,
+  "parsed_candidates": 16429,
+  "deduped_candidates": 8585,
   "probe_limit": 900,
   "probe_input": 900,
   "live_results": 900,
   "selected": 128,
   "output_file": "m_configs.txt",
   "errors": [],
-  "duration_sec": 10.292,
+  "duration_sec": 11.874,
   "output_nonempty": true
 }
