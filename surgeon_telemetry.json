@@ -23,9 +23,9 @@
     "https://raw.githubusercontent.com/V2RAYCONFIGSPOOL/V2RAY_SUB/refs/heads/main/v2ray_configs_no10.txt"
   ],
   "fetched_sources": 10,
-  "extracted_uris": 12050,
-  "parsed_candidates": 6823,
-  "deduped_candidates": 2194,
+  "extracted_uris": 11906,
+  "parsed_candidates": 6688,
+  "deduped_candidates": 2156,
   "probe_limit": 900,
   "probe_input": 900,
   "live_results": 900,
@@ -43,6 +43,6 @@
     "https://raw.githubusercontent.com/V2RAYCONFIGSPOOL/V2RAY_SUB/refs/heads/main/v2ray_configs_no9.txt: 404 Client Error: Not Found for url: https://raw.githubusercontent.com/V2RAYCONFIGSPOOL/V2RAY_SUB/refs/heads/main/v2ray_configs_no9.txt",
     "https://raw.githubusercontent.com/V2RAYCONFIGSPOOL/V2RAY_SUB/refs/heads/main/v2ray_configs_no10.txt: 404 Client Error: Not Found for url: https://raw.githubusercontent.com/V2RAYCONFIGSPOOL/V2RAY_SUB/refs/heads/main/v2ray_configs_no10.txt"
   ],
-  "duration_sec": 11.612,
+  "duration_sec": 9.994,
   "output_nonempty": true
 }
